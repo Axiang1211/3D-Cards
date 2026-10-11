@@ -93,6 +93,15 @@ const entry = {
   posX: num(card.posX, 50, 0, 100),
   posY: num(card.posY, 50, 0, 100),
 };
+const extra = {
+  bgBlur: [0, 0, 100], foilStrength: [100, 0, 200], foilScale: [100, 50, 200], foilHue: [0, 0, 360],
+  fgZoom: [1, 0.5, 3], fgX: [0, -50, 50], fgY: [0, -50, 50], fgFoilStrength: [100, 0, 200], fgFoilHue: [0, 0, 360],
+};
+for (const [k, [d, lo, hi]] of Object.entries(extra)) {
+  const v = num(card[k], d, lo, hi);
+  if (v !== d) entry[k] = v;
+}
+if (card.fgFoil && card.fgFoil !== "none") entry.fgFoil = card.fgFoil;
 if (card.showText === false) entry.showText = false;
 list.push(entry);
 

@@ -1,0 +1,68 @@
+{
+  "name": "3d-cards-desktop",
+  "productName": "3D Cards",
+  "version": "1.0.0",
+  "description": "把照片做成會反光的 3D 卡片",
+  "author": "Axiang1211",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Axiang1211/3D-Cards.git"
+  },
+  "main": "main.js",
+  "scripts": {
+    "web": "node copy-web.js",
+    "start": "node copy-web.js && electron .",
+    "dist": "node copy-web.js && electron-builder --win nsis --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.0"
+  },
+  "devDependencies": {
+    "electron": "^43.7.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "top.dreamsworld.3dcards",
+    "productName": "3D Cards",
+    "copyright": "MIT License",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "updater.js",
+      "web/**/*",
+      "build/icon.ico",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "artifactName": "3D-Cards-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "3D Cards",
+      "uninstallDisplayName": "3D Cards",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "language": "1028"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Axiang1211",
+        "repo": "3D-Cards",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

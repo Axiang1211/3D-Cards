@@ -58,10 +58,17 @@
   HC.describe = function (card) {
     const frame = (HC.FRAMES.find((f) => f.id === card.frame) || {}).name || "";
     const area = (HC.AREAS.find((a) => a.id === card.area) || {}).name || "";
-    if (card.foil === "gloss") return `亮面，${frame === "無邊框" ? "無邊框" : frame + "框"}`;
-    const where = card.frame === "none" && card.area === "frame" ? "整張" : area;
-    return `${HC.foilName(card.foil)}鐳射在${where}，${frame === "無邊框" ? "無邊框" : frame + "框"}`;
+    const frameText = frame === "無邊框" ? "無邊框" : frame + "框";
+    let text;
+    if (card.foil === "gloss") text = "亮面，" + frameText;
+    else {
+      const where = card.frame === "none" && card.area === "frame" ? "整張" : area;
+      text = `${HC.foilName(card.foil)}鐳射在${where}，${frameText}`;
+    }
+    if (card.fg && card.fgFoil && card.fgFoil !== "none") text += `，前景${HC.foilName(card.fgFoil)}鐳射`;
+    return text;
   };
+
 
   /* ------------------------------------------------------------------ */
   /* Card repository: gallery cards + the visitor's own cards            */
@@ -135,6 +142,7 @@
     let m;
     if ((m = hash.match(/^\/card\/([\w-]+)\/?$/))) return { name: "detail", id: m[1] };
     if ((m = hash.match(/^\/create(?:\/([\w-]+))?\/?$/))) return { name: "create", id: m[1] || null };
+    if ((m = hash.match(/^\/s\/([A-Za-z0-9]+)\/?$/))) return { name: "shared", id: m[1] };
     return { name: "gallery" };
   }
 
@@ -145,7 +153,7 @@
     if (current && current.destroy) current.destroy();
     current = null;
     const next = HC.h("div.view.view--" + r.name);
-    document.body.dataset.view = r.name;
+    document.body.dataset.view = r.name === "shared" ? "detail" : r.name;
     document.querySelectorAll("[data-nav]").forEach((a) => {
       a.toggleAttribute("aria-current", a.dataset.nav === r.name);
     });
@@ -175,8 +183,37 @@
     else location.hash = hash;
   };
 
+  /* A share link (/s/<id> or ?s=<id>) becomes the #/s/<id> route. */
+  function adoptShareUrl() {
+    const m = location.pathname.match(/\/s\/([A-Za-z0-9]+)\/?$/);
+    const q = new URLSearchParams(location.search).get("s");
+    const id = m ? m[1] : q && /^[A-Za-z0-9]+$/.test(q) ? q : null;
+    if (!id || location.hash) return;
+    const base = m ? location.pathname.slice(0, m.index + 1) : location.pathname;
+    try {
+      history.replaceState(null, "", base + "#/s/" + id);
+    } catch (e) {
+      location.hash = "#/s/" + id;
+    }
+  }
+
   function boot() {
+    adoptShareUrl();
+    if (window.HC_DESKTOP) document.documentElement.classList.add("is-desktop");
     document.querySelectorAll("[data-site-name]").forEach((n) => (n.textContent = CONFIG.siteName || "Holo Card"));
+    const D = window.HC_DESKTOP;
+    const links = document.querySelector(".site-foot__links");
+    if (D && typeof D.version === "function" && links) {
+      const ver = HC.h("span.site-foot__ver", "電腦版");
+      const upd = HC.h("button.site-foot__link.site-foot__btn", { type: "button", onclick: () => D.checkForUpdates() }, "檢查更新");
+      links.prepend(ver, upd);
+      D.version().then((v) => (ver.textContent = "電腦版 " + v)).catch(() => {});
+    }
+    const dl = document.getElementById("download-link");
+    if (dl && CONFIG.downloadUrl && !window.HC_DESKTOP) {
+      dl.href = CONFIG.downloadUrl;
+      dl.hidden = false;
+    }
     const repo = document.getElementById("repo-link");
     if (repo) {
       if (CONFIG.repoUrl) repo.href = CONFIG.repoUrl;

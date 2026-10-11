@@ -96,6 +96,13 @@
       }
     });
 
+    const shareBtn = h("button.btn.btn--share", { type: "button" }, "分享");
+    const syncShare = () => {
+      shareBtn.textContent = data.own && HC.share.current(data) ? "分享中・查看連結" : "分享";
+    };
+    shareBtn.addEventListener("click", () => HC.openShare(data, syncShare));
+    syncShare();
+
     let ownTools = null;
     if (data.own) {
       const del = h("button.btn.btn--danger", { type: "button" }, "刪除");
@@ -130,7 +137,7 @@
           meta,
           data.own ? h("p.placard__own", "你做的卡片，只存在這個瀏覽器裡。") : null
         ),
-        h("div.room__tools", foilPick, note, h("div.room__actions", flipBtn, gyroBtn, exportBtn), ownTools),
+        h("div.room__tools", foilPick, note, h("div.room__actions", shareBtn, flipBtn, gyroBtn, exportBtn), ownTools),
         h(
           "p.room__hint",
           h("span.hint-desk", "移動滑鼠或拖曳來傾斜卡片，點一下翻面。方向鍵也能傾斜。"),
@@ -143,6 +150,7 @@
     /* Keyboard: [ and ] or PageUp/PageDown step through the collection. */
     const onKey = (e) => {
       if (e.target.closest("input, textarea, select")) return;
+      if (document.querySelector("dialog[open]")) return;
       if (all.length < 2) return;
       if (e.key === "[" || e.key === "PageUp") HC.go("#/card/" + prev.id);
       if (e.key === "]" || e.key === "PageDown") HC.go("#/card/" + next.id);

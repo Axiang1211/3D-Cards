@@ -35,19 +35,58 @@
   ];
   HC.foilName = (id) => (HC.FOILS.find((f) => f.id === id) || HC.FOILS[0]).name;
 
+  HC.FG_FOILS = [{ id: "none", name: "無" }].concat(HC.FOILS.filter((f) => f.id !== "gloss"));
+
   HC.DEFAULTS = {
     title: "",
     subtitle: "",
     serial: "",
     image: "",
     fg: "",
-    foil: "rainbow",
-    area: "full",
+    showText: true,
     frame: "white",
+    // background photo
     zoom: 1,
     posX: 50,
     posY: 50,
-    showText: true,
+    bgBlur: 0, // 0..100, only used when there is a foreground
+    // background foil
+    foil: "rainbow",
+    area: "full",
+    foilStrength: 100, // %, 0..200
+    foilScale: 100, // %, 50..200
+    foilHue: 0, // degrees, 0..360
+    // foreground layer
+    fgZoom: 1,
+    fgX: 0, // % offset, -50..50
+    fgY: 0,
+    fgFoil: "none",
+    fgFoilStrength: 100,
+    fgFoilHue: 0,
+  };
+
+  /** Clamp every numeric field into its valid range. */
+  HC.normalize = function (c) {
+    const n = (v, d, lo, hi) => (Number.isFinite(+v) && v !== "" && v != null ? Math.min(hi, Math.max(lo, +v)) : d);
+    const pick = (v, list, d) => (list.some((x) => x.id === v) ? v : d);
+    return {
+      foil: pick(c.foil, HC.FOILS, "rainbow"),
+      area: pick(c.area, HC.AREAS, "full"),
+      frame: pick(c.frame, HC.FRAMES, "white"),
+      zoom: n(c.zoom, 1, 1, 4),
+      posX: n(c.posX, 50, 0, 100),
+      posY: n(c.posY, 50, 0, 100),
+      bgBlur: n(c.bgBlur, 0, 0, 100),
+      foilStrength: n(c.foilStrength, 100, 0, 200),
+      foilScale: n(c.foilScale, 100, 50, 200),
+      foilHue: n(c.foilHue, 0, 0, 360),
+      fgZoom: n(c.fgZoom, 1, 0.5, 3),
+      fgX: n(c.fgX, 0, -50, 50),
+      fgY: n(c.fgY, 0, -50, 50),
+      fgFoil: pick(c.fgFoil, HC.FG_FOILS, "none"),
+      fgFoilStrength: n(c.fgFoilStrength, 100, 0, 200),
+      fgFoilHue: n(c.fgFoilHue, 0, 0, 360),
+    };
   };
 
   /* Glitter texture for the stardust foil, generated once per page. */
@@ -141,14 +180,18 @@
       const front = el("div", "hc__face hc__front", flip);
       const art = el("div", "hc__art", front);
       const bg = el("img", "hc__bg", art);
+      // Background foil inside the photo window, under the foreground.
+      const artFoil = [el("div", "hc__foil hc__foil--art hc__foil--dodge", art), el("div", "hc__foil hc__foil--art hc__foil--screen", art)];
       const fg = el("img", "hc__fg", art);
+      // Foreground foil: same box as the foreground, masked to its shape.
+      const fgFoil = [el("div", "hc__foil hc__foil--fg hc__foil--dodge", art), el("div", "hc__foil hc__foil--fg hc__foil--screen", art)];
       [bg, fg].forEach((img) => {
         img.alt = "";
         img.draggable = false;
         img.decoding = "async";
       });
-      el("div", "hc__foil hc__foil--dodge", front);
-      el("div", "hc__foil hc__foil--screen", front);
+      // Background foil on the frame.
+      const frameFoil = [el("div", "hc__foil hc__foil--frame hc__foil--dodge", front), el("div", "hc__foil hc__foil--frame hc__foil--screen", front)];
       const text = el("div", "hc__text", front);
       const title = el("p", "hc__title", text);
       const meta = el("div", "hc__meta", text);
@@ -159,31 +202,70 @@
       const back = el("div", "hc__face hc__back", flip);
       el("div", "hc__back-pattern", back);
       const mark = el("div", "hc__back-mark", back);
-      el("span", "hc__back-logo", mark).setAttribute("aria-hidden", "true");
-      el("span", "", mark).textContent = ((window.HC_CONFIG && HC_CONFIG.siteName) || "Holo Card").toUpperCase();
+      const cfg = window.HC_CONFIG || {};
+      const logo = el("img", "hc__back-logo", mark);
+      logo.src = cfg.backLogo || "brand/logo-mark-192.png";
+      logo.alt = "";
+      logo.draggable = false;
+      logo.addEventListener("error", () => logo.remove());
+      el("span", "", mark).textContent = (cfg.siteName || "3D Cards").toUpperCase();
       const backSerial = el("span", "hc__back-serial", back);
-      el("div", "hc__foil hc__foil--back", back);
+      const backFoil = [el("div", "hc__foil hc__foil--back", back)];
       el("div", "hc__glare", back);
 
       fg.addEventListener("error", () => (fg.hidden = true));
       this.el = root;
-      this.n = { shadow, tilt, flip, front, art, bg, fg, text, title, sub, serial, backSerial };
+      this.n = { shadow, tilt, flip, front, art, bg, fg, text, title, sub, serial, backSerial, artFoil, fgFoil, frameFoil, backFoil };
     }
 
     /** Replace the card's content without rebuilding it. */
     setData(data) {
       const d = (this.data = Object.assign({}, HC.DEFAULTS, data));
       const n = this.n;
-      const frame = d.frame || "white";
-      let area = d.area || "full";
+      const v = HC.normalize(d);
+      Object.assign(d, v);
+      const frame = v.frame;
+      let area = v.area;
       if (frame === "none" && area === "frame") area = "full";
+      const hasFg = !!d.fg;
+      const st = this.el.style;
 
-      this.el.dataset.foil = d.foil || "rainbow";
+      this.el.dataset.foil = v.foil;
       this.el.dataset.frame = frame;
       this.el.dataset.area = area;
-      this.el.style.setProperty("--zoom", clamp(+d.zoom || 1, 1, 4));
-      this.el.style.setProperty("--px", clamp(+d.posX, 0, 100) + "%");
-      this.el.style.setProperty("--py", clamp(+d.posY, 0, 100) + "%");
+      this.el.classList.toggle("hc--fg", hasFg);
+      st.setProperty("--zoom", v.zoom);
+      st.setProperty("--px", v.posX + "%");
+      st.setProperty("--py", v.posY + "%");
+      const blur = hasFg ? v.bgBlur : 0;
+      st.setProperty("--bgblur", (blur * 0.06).toFixed(2) + "cqw");
+      st.setProperty("--blurscale", (1 + blur * 0.0016).toFixed(4));
+      st.setProperty("--fzoom", v.fgZoom);
+      st.setProperty("--fx", v.fgX + "%");
+      st.setProperty("--fy", v.fgY + "%");
+
+      const paint = (els, foil, strength, scale, hue, show) => {
+        els.forEach((e) => {
+          e.dataset.foil = foil;
+          e.hidden = !show;
+          e.style.setProperty("--k", (strength / 100).toFixed(3));
+          e.style.setProperty("--sc", (scale / 100).toFixed(3));
+          e.style.setProperty("--hue", hue + "deg");
+        });
+      };
+      const bgOn = v.foil !== "gloss";
+      paint(n.artFoil, v.foil, v.foilStrength, v.foilScale, v.foilHue, bgOn && (area === "full" || area === "art"));
+      paint(n.frameFoil, v.foil, v.foilStrength, v.foilScale, v.foilHue, bgOn && frame !== "none" && (area === "full" || area === "frame"));
+      paint(n.fgFoil, v.fgFoil, v.fgFoilStrength, v.foilScale, v.fgFoilHue, hasFg && v.fgFoil !== "none");
+      paint(n.backFoil, v.foil === "gloss" ? "rainbow" : v.foil, 100, 100, v.foilHue, true);
+      const mask = hasFg ? `url("${String(d.fg).replace(/"/g, "%22")}")` : "none";
+      n.fgFoil.forEach((e) => {
+        if (e._mask !== mask) {
+          e._mask = mask;
+          e.style.webkitMaskImage = mask;
+          e.style.maskImage = mask;
+        }
+      });
 
       if (d.image) {
         if (n.bg.getAttribute("src") !== d.image) n.bg.src = d.image;

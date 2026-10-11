@@ -136,12 +136,10 @@ body[data-view="detail"] .site-head { background: color-mix(in srgb, var(--room)
   text-decoration: none;
 }
 .brand__mark {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: conic-gradient(from 210deg, #ff8fb1, #ffd88a, #9cf5c4, #8fd8ff, #b9a2ff, #ff8fb1);
-  -webkit-mask: radial-gradient(circle, transparent 44%, #000 46%);
-          mask: radial-gradient(circle, transparent 44%, #000 46%);
+  width: 40px;
+  height: 40px;
+  margin: -6px 0 -6px -6px;
+  object-fit: contain;
 }
 .site-nav { display: flex; align-items: center; gap: 22px; }
 .site-nav__link { font-size: 15px; text-decoration: none; color: var(--muted); }
@@ -701,3 +699,50 @@ body[data-view="detail"] .toast[data-kind="error"] { background: var(--danger); 
   *, *::before, *::after { transition-duration: .01ms !important; scroll-behavior: auto !important; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Download link, share button and share dialog                        */
+/* ------------------------------------------------------------------ */
+@media (hover: none), (pointer: coarse) { .only-desk { display: none !important; } }
+.is-desktop .only-desk { display: none !important; }
+
+.hero__download { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.hero__download a { color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
+.site-foot__links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+
+.btn--share { background: var(--room-ink); color: var(--room); }
+.btn--share:hover { background: #fff; }
+.placard__from { font-size: 13px; color: var(--room-muted); margin-bottom: 8px; }
+
+.share {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: var(--wall-hi);
+  color: var(--ink);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .35);
+  color-scheme: light;
+}
+.share::backdrop { background: rgba(10, 12, 18, .55); }
+.share__head { display: flex; align-items: center; justify-content: space-between; padding: 20px 22px 0; }
+.share__title { font-size: 20px; letter-spacing: -.01em; }
+.share__x {
+  width: 36px; height: 36px; border: 0; border-radius: 50%;
+  background: none; font-size: 26px; line-height: 1; color: var(--muted); cursor: pointer;
+}
+.share__x:hover { background: rgba(27, 29, 33, .07); color: var(--ink); }
+.share__body { display: flex; flex-direction: column; gap: 16px; padding: 14px 22px 22px; }
+.share__note { font-size: 14px; color: var(--muted); }
+.share__warn { color: #8a5a00; }
+.share__link { width: 100%; font-size: 15px; }
+.share__actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.share__stop { align-self: flex-start; color: var(--danger); }
+.share__stop:hover { color: var(--danger); }
+
+/* Maker: nested control groups */
+.tune, .fg-controls { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.tune.is-off { opacity: .4; pointer-events: none; }
+.fg-controls { padding: 18px 0 0; border-top: 1px dashed var(--rule); }
+.fg-controls[hidden] { display: none; }
+.site-foot__btn { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

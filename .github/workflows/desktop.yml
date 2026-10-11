@@ -1,0 +1,49 @@
+# Builds the Windows installer (3D-Cards-Setup.exe) and publishes it on the Releases page.
+#
+# How to use (no command line needed):
+#   GitHub → Actions → 「建置 Windows 電腦版」 → Run workflow → enter a version → Run workflow.
+# The version must be higher than the previous one (1.0.0 → 1.0.1 → 1.1.0 …).
+# Installed apps see the new version on their next start and offer to update.
+
+name: 建置 Windows 電腦版
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本號（例如 1.0.1，要比上一版大）"
+        required: true
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check version format
+        shell: bash
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::版本號要寫成三段數字，例如 1.0.1"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Build installer and publish release
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node copy-web.js
+          npx electron-builder --win nsis --x64 --publish always -c.extraMetadata.version=${{ inputs.version }}

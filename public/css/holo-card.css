@@ -100,26 +100,45 @@
 .hc.hc--notext:not([data-frame="none"]) .hc__art { bottom: var(--in); }
 
 .hc__bg,
-.hc__fg {
+.hc__fg,
+.hc__foil--fg {
   position: absolute;
   left: -6%;
   top: -6%;
   width: 112%;
   height: 112%;
   max-width: none;
-  object-fit: cover;
-  object-position: var(--px) var(--py);
   pointer-events: none;
 }
-/* The photo drifts against the tilt, the cut-out drifts with it: depth. */
-.hc__bg {
-  transform: translate(calc(var(--dx) * -2.6cqw), calc(var(--dy) * -2.6cqw)) scale(var(--zoom));
-}
+.hc__bg,
 .hc__fg {
-  transform: translate(calc(var(--dx) * 3.2cqw), calc(var(--dy) * 3.2cqw)) scale(var(--zoom));
-  filter: drop-shadow(0 1.6cqw 2cqw rgba(0, 0, 0, .35));
+  object-fit: cover;
+  object-position: var(--px) var(--py);
 }
-.hc__bg[hidden], .hc__fg[hidden] { display: none; }
+/* The photo drifts against the tilt, the cut-out drifts with it: depth.
+   A blurred photo is scaled up a little so its soft edges stay hidden. */
+.hc__bg {
+  transform: translate(calc(var(--dx) * -2.6cqw), calc(var(--dy) * -2.6cqw)) scale(calc(var(--zoom) * var(--blurscale, 1)));
+  filter: blur(var(--bgblur, 0px));
+}
+/* The foreground follows the photo's framing, plus its own offset and size. */
+.hc__fg,
+.hc__foil--fg {
+  transform:
+    translate(calc(var(--dx) * 3.2cqw + var(--fx, 0%)), calc(var(--dy) * 3.2cqw + var(--fy, 0%)))
+    scale(calc(var(--zoom) * var(--fzoom, 1)));
+}
+.hc__fg { filter: drop-shadow(0 1.6cqw 2cqw rgba(0, 0, 0, .35)); }
+/* The foreground foil takes the exact shape of the foreground picture. */
+.hc__foil--fg {
+  -webkit-mask-size: cover;
+          mask-size: cover;
+  -webkit-mask-position: var(--px) var(--py);
+          mask-position: var(--px) var(--py);
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+}
+.hc__bg[hidden], .hc__fg[hidden], .hc__foil[hidden] { display: none; }
 
 /* ------------------------------------------------------------------ */
 /* Text                                                                */
@@ -187,29 +206,36 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-size: 260% 260%;
-  background-position: var(--bgx) var(--bgy);
+  --k: 1;     /* strength, set per layer from the card settings */
+  --sc: 1;    /* pattern size */
+  --hue: 0deg;
 }
-.hc__foil--dodge  { mix-blend-mode: color-dodge; opacity: var(--o); }
-.hc__foil--screen { mix-blend-mode: screen; opacity: calc(var(--o) * var(--screen-k)); }
+.hc__foil--dodge  { mix-blend-mode: color-dodge; opacity: min(1, calc(var(--o) * var(--k))); }
+.hc__foil--screen { mix-blend-mode: screen; opacity: min(1, calc(var(--o) * var(--screen-k) * var(--k))); }
 
-/* Where the foil sits. */
-.hc[data-area="art"] .hc__front .hc__foil {
-  inset: var(--in) var(--in) var(--band) var(--in);
-  border-radius: 2.2cqw;
+/* Background foil inside the photo window. It is sized like the whole card
+   so its pattern lines up with the foil on the frame. */
+.hc__foil--art {
+  inset: auto;
+  left: calc(-1 * var(--art-l));
+  top: calc(-1 * var(--art-t));
+  width: 100cqw;
+  height: calc(100cqw * 88 / 63);
 }
-.hc[data-area="art"][data-frame="none"] .hc__front .hc__foil { inset: 0; border-radius: 0; }
-.hc[data-area="art"].hc--notext .hc__front .hc__foil { bottom: var(--in); }
-.hc[data-area="frame"] .hc__front .hc__foil {
+.hc { --art-l: var(--in); --art-t: var(--in); }
+.hc[data-frame="none"] { --art-l: 0px; --art-t: 0px; }
+
+/* Background foil on the frame only (the photo window is cut out). */
+.hc__foil--frame {
   padding: var(--in) var(--in) var(--band) var(--in);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
-.hc[data-area="frame"].hc--notext .hc__front .hc__foil { padding-bottom: var(--in); }
+.hc--notext .hc__foil--frame { padding-bottom: var(--in); }
 
 /* Rainbow: wide diagonal spectrum crossed by fine diffraction lines. */
-.hc[data-foil="rainbow"] .hc__foil {
+.hc__foil[data-foil="rainbow"] {
   background-image:
     repeating-linear-gradient(-62deg,
       rgba(0, 0, 0, .55) 0, rgba(0, 0, 0, .55) .9%,
@@ -219,14 +245,15 @@
       hsl(140 90% 62%) 10.5%, hsl(190 100% 64%) 14%, hsl(235 100% 72%) 17.5%,
       hsl(290 95% 72%) 21%, hsl(350 100% 70%) 24.5%);
   background-blend-mode: soft-light, normal;
-  background-size: 180% 180%, 300% 300%;
+  background-size: calc(180% * var(--sc)) calc(180% * var(--sc)), calc(300% * var(--sc)) calc(300% * var(--sc));
   background-position: calc(100% - var(--bgx)) var(--bgy), var(--bgx) var(--bgy);
-  filter: brightness(.56) contrast(1.45) saturate(.9);
+  filter: brightness(.56) contrast(1.45) saturate(.9) hue-rotate(var(--hue));
 }
 
 /* Stardust: two glitter layers at different scales slide against each */
 /* other, so individual flecks wink on and off as the card tilts.      */
-.hc[data-foil="stardust"] .hc__foil {
+.hc__foil[data-foil="stardust"] {
+  --screen-k: .28;
   background-image:
     var(--hc-sparkle, none),
     var(--hc-sparkle, none),
@@ -234,45 +261,42 @@
       hsl(200 100% 70%) 0%, hsl(270 100% 74%) 6%, hsl(330 100% 72%) 12%,
       hsl(40 100% 68%) 18%, hsl(160 90% 64%) 24%, hsl(200 100% 70%) 30%);
   background-blend-mode: color-dodge, multiply, normal;
-  background-size: 34cqw 34cqw, 51cqw 51cqw, 300% 300%;
+  background-size: calc(34cqw * var(--sc)) calc(34cqw * var(--sc)), calc(51cqw * var(--sc)) calc(51cqw * var(--sc)), calc(300% * var(--sc)) calc(300% * var(--sc));
   background-position:
     calc(var(--dx) * 11cqw) calc(var(--dy) * 11cqw),
     calc(var(--dx) * -7cqw) calc(var(--dy) * -7cqw),
     var(--bgx) var(--bgy);
-  filter: brightness(.62) contrast(1.6) saturate(1);
+  filter: brightness(.62) contrast(1.6) saturate(1) hue-rotate(var(--hue));
 }
-.hc[data-foil="stardust"] { --screen-k: .28; }
 
 /* Prism: a spectrum wheel that turns with the tilt, over fine rings.  */
-.hc[data-foil="prism"] .hc__foil {
+.hc__foil[data-foil="prism"] {
   background-image:
     repeating-radial-gradient(circle at var(--mx) var(--my),
-      rgba(0, 0, 0, .5) 0, rgba(255, 255, 255, .35) 1.6cqw, rgba(0, 0, 0, .5) 3.2cqw),
+      rgba(0, 0, 0, .5) 0, rgba(255, 255, 255, .35) calc(1.6cqw * var(--sc)), rgba(0, 0, 0, .5) calc(3.2cqw * var(--sc))),
     conic-gradient(from var(--ang) at var(--mx) var(--my),
       hsl(0 100% 70%), hsl(55 100% 66%), hsl(120 90% 64%), hsl(185 100% 66%),
       hsl(240 100% 74%), hsl(300 95% 72%), hsl(360 100% 70%));
   background-blend-mode: soft-light, normal;
   background-size: 100% 100%, 100% 100%;
   background-position: center;
-  filter: brightness(.5) contrast(1.4) saturate(.85);
+  filter: brightness(.5) contrast(1.4) saturate(.85) hue-rotate(var(--hue));
 }
 
 /* Metal: brushed lines with a band of light that sweeps across.       */
-.hc[data-foil="metal"] .hc__foil {
+.hc__foil[data-foil="metal"] {
   background-image:
     linear-gradient(100deg,
       transparent calc(var(--bgx) - 30%), rgba(255, 255, 255, .95) var(--bgx), transparent calc(var(--bgx) + 30%)),
     repeating-linear-gradient(90deg,
-      rgba(255, 255, 255, .22) 0, rgba(255, 255, 255, .22) .35cqw, rgba(0, 0, 0, .25) .35cqw, rgba(0, 0, 0, .25) .7cqw),
+      rgba(255, 255, 255, .22) 0, rgba(255, 255, 255, .22) calc(.35cqw * var(--sc)),
+      rgba(0, 0, 0, .25) calc(.35cqw * var(--sc)), rgba(0, 0, 0, .25) calc(.7cqw * var(--sc))),
     linear-gradient(170deg, hsl(195 70% 62%), hsl(260 55% 64%) 45%, hsl(30 80% 64%));
   background-blend-mode: overlay, overlay, normal;
   background-size: 100% 100%, 100% 100%, 100% 260%;
   background-position: center, center, 50% var(--bgy);
-  filter: brightness(.5) contrast(1.35);
+  filter: brightness(.5) contrast(1.35) hue-rotate(var(--hue));
 }
-
-/* Gloss: no foil, only the glare. */
-.hc[data-foil="gloss"] .hc__front .hc__foil { display: none; }
 
 /* ------------------------------------------------------------------ */
 /* Glare: a soft light that follows the pointer.                       */
@@ -324,13 +348,10 @@
   text-indent: .32em;
 }
 .hc__back-logo {
-  width: 24cqw;
-  height: 24cqw;
-  border-radius: 50%;
-  background:
-    conic-gradient(from 210deg, #ff8fb1, #ffd88a, #9cf5c4, #8fd8ff, #b9a2ff, #ff8fb1);
-  -webkit-mask: radial-gradient(circle, transparent 46%, #000 47%);
-          mask: radial-gradient(circle, transparent 46%, #000 47%);
+  width: 46cqw;
+  height: 46cqw;
+  object-fit: contain;
+  filter: drop-shadow(0 2cqw 3cqw rgba(0, 0, 0, .35));
 }
 .hc__back-serial {
   position: absolute;
@@ -342,9 +363,6 @@
 .hc__foil--back {
   mix-blend-mode: color-dodge;
   opacity: calc(var(--o) * .7);
-  background-image: repeating-linear-gradient(118deg,
-    hsl(350 100% 70%) 0%, hsl(62 100% 64%) 6%, hsl(190 100% 64%) 12%, hsl(290 95% 72%) 18%, hsl(350 100% 70%) 24%);
-  background-size: 300% 300%;
 }
 
 @media (prefers-reduced-motion: reduce) {

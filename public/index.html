@@ -3,13 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Holo Card</title>
-  <meta name="description" content="上傳照片，做成會跟著滑鼠與手機傾斜、帶有鐳射光澤的 3D 卡片。開源，免費，照片不會上傳。">
+  <title>3D Cards</title>
+  <meta name="description" content="上傳照片，選一種鐳射，做成會跟著滑鼠和手機轉動的 3D 卡片。">
   <meta name="theme-color" content="#dde0e3">
-  <meta property="og:title" content="Holo Card：鐳射卡片產生器">
-  <meta property="og:description" content="上傳照片，做成會跟著視角變化光澤的 3D 鐳射卡片。">
   <meta property="og:type" content="website">
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta property="og:site_name" content="3D Cards">
+  <meta property="og:title" content="3D Cards：把照片做成會反光的 3D 卡片">
+  <meta property="og:description" content="上傳照片，選一種鐳射，做成會跟著滑鼠和手機轉動的 3D 卡片。">
+  <meta property="og:image" content="brand/og-image.png">
+  <meta property="og:url" content="">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="brand/logo-mark-64.png" type="image/png">
+  <link rel="icon" href="brand/logo-mark-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Noto+Sans+TC:wght@400..700&display=swap">
@@ -21,8 +27,8 @@
 
   <header class="site-head">
     <a class="brand" href="#/" data-nav="brand">
-      <span class="brand__mark" aria-hidden="true"></span>
-      <span data-site-name>Holo Card</span>
+      <img class="brand__mark" src="brand/logo-mark-64.png" srcset="brand/logo-mark-128.png 2x" alt="" width="40" height="40">
+      <span data-site-name>3D Cards</span>
     </a>
     <nav class="site-nav" aria-label="主要">
       <a class="site-nav__link" href="#/" data-nav="gallery">展廳</a>
@@ -33,8 +39,11 @@
   <main id="view" tabindex="-1"></main>
 
   <footer class="site-foot">
-    <p>開源專案，以 MIT 授權釋出。照片只在你的瀏覽器裡處理，不會上傳。</p>
-    <a id="repo-link" class="site-foot__link" href="#" rel="noopener">在 GitHub 查看原始碼</a>
+    <p>開源專案，以 MIT 授權釋出。照片只在你的瀏覽器裡處理，按下「分享」的卡片才會上傳。</p>
+    <span class="site-foot__links">
+      <a id="download-link" class="site-foot__link only-desk" href="#" rel="noopener" hidden>下載 Windows 電腦版</a>
+      <a id="repo-link" class="site-foot__link" href="#" rel="noopener">在 GitHub 查看原始碼</a>
+    </span>
   </footer>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -47,9 +56,11 @@
   <script src="js/holo-card.js"></script>
   <script src="js/store.js"></script>
   <script src="js/io.js"></script>
+  <script src="js/share.js"></script>
   <script src="js/view-gallery.js"></script>
   <script src="js/view-detail.js"></script>
   <script src="js/view-create.js"></script>
+  <script src="js/view-shared.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

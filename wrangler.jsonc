@@ -1,11 +1,18 @@
 {
-  // Cloudflare Workers static assets: everything in ./public is served as-is.
+  // 3D Cards on Cloudflare Workers.
   // The Worker name must match the project name in the Cloudflare dashboard.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "holo-cards",
+  "main": "src/worker.js",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./public",
-    "not_found_handling": "404-page"
-  }
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    // These paths go through src/worker.js first; everything else is served as a static file.
+    "run_worker_first": ["/", "/index.html", "/s/*", "/api/*"]
+  },
+  // Storage for shared cards. Cloudflare creates it automatically on the first deploy
+  // and reuses it on later deploys (matched by the binding name).
+  "kv_namespaces": [{ "binding": "SHARES" }]
 }

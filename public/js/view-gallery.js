@@ -50,7 +50,14 @@
           "看看展廳"
         )
       ),
-      h("p.hero__note", "照片只在你的瀏覽器裡處理，不會上傳到任何伺服器。")
+      h("p.hero__note", "照片只在你的瀏覽器裡處理。只有在你按下「分享」時，那張卡片才會上傳。"),
+      CONFIG.downloadUrl && !window.HC_DESKTOP
+        ? h(
+            "p.hero__download.only-desk",
+            h("a", { href: CONFIG.downloadUrl, rel: "noopener" }, "下載 Windows 電腦版"),
+            h("span", "安裝後不用開瀏覽器也能做卡片")
+          )
+        : null
     );
     hero.appendChild(copy);
 

@@ -75,10 +75,9 @@
       }
     }
 
-    const draft = Object.assign(
-      { title: "", subtitle: "", serial: "", foil: "rainbow", area: "full", frame: "white", zoom: 1, posX: 50, posY: 50, showText: true, imageBlob: null, fgBlob: null },
-      editing || {}
-    );
+    const draft = Object.assign({}, HC.DEFAULTS, { imageBlob: null, fgBlob: null }, editing || {});
+    delete draft.image;
+    delete draft.fg;
     const urls = { bg: "", fg: "" };
     const setUrl = (k, blob) => {
       if (urls[k]) URL.revokeObjectURL(urls[k]);
@@ -160,38 +159,105 @@
     document.addEventListener("dragleave", onDragLeave);
     document.addEventListener("drop", onDrop);
 
-    /* Composition ------------------------------------------------------- */
+    /* Sliders ----------------------------------------------------------- */
     const pct = (v) => Math.round(v) + "%";
-    const zoomF = range("縮放", { min: 1, max: 3, step: 0.01, value: draft.zoom, format: (v) => v.toFixed(2) + "×" }, (v) => {
-      draft.zoom = v;
+    const signed = (v) => (v > 0 ? "+" : "") + Math.round(v) + "%";
+    const times = (v) => v.toFixed(2) + "×";
+    const deg = (v) => Math.round(v) + "°";
+    const sliders = {};
+    const slider = (key, label, opts) => {
+      const f = range(label, Object.assign({ value: draft[key] }, opts), (v) => {
+        draft[key] = v;
+        refresh();
+      });
+      sliders[key] = f;
+      return f;
+    };
+    const resetBtn = (label, keys) => {
+      const b = h("button.btn.btn--quiet.btn--sm", { type: "button" }, label);
+      b.addEventListener("click", () => {
+        keys.forEach((key) => {
+          draft[key] = HC.DEFAULTS[key];
+          if (sliders[key]) sliders[key].set(HC.DEFAULTS[key]);
+          if (segs[key]) segs[key].set(HC.DEFAULTS[key]);
+        });
+        syncFoilFields();
+        refresh();
+      });
+      return h("div.group__foot", b);
+    };
+    const segs = {};
+
+    /* Background photo ------------------------------------------------- */
+    const bgFields = [
+      slider("zoom", "縮放", { min: 1, max: 3, step: 0.01, format: times }),
+      slider("posX", "水平位置", { min: 0, max: 100, step: 1, format: pct }),
+      slider("posY", "垂直位置", { min: 0, max: 100, step: 1, format: pct }),
+    ];
+    const blurF = slider("bgBlur", "背景模糊", { min: 0, max: 100, step: 1, format: (v) => (v ? Math.round(v) : "不模糊") });
+    const blurNote = h("p.group__help", "加入前景圖層後才能模糊背景，讓前景更突出。");
+
+    /* Background foil -------------------------------------------------- */
+    const foilF = segGroup("foil", "樣式", HC.FOILS, draft.foil, (v) => {
+      draft.foil = v;
+      syncFoilFields();
+      refresh();
+    }, (o) => h("span.foil-pick__swatch", { "aria-hidden": "true", dataset: { foil: o.id } }));
+    foilF.classList.add("field--foil");
+    segs.foil = foilF;
+    const areaF = segGroup("area", "範圍", HC.AREAS, draft.area, (v) => {
+      draft.area = v;
       refresh();
     });
-    const xF = range("水平位置", { min: 0, max: 100, step: 1, value: draft.posX, format: pct }, (v) => {
-      draft.posX = v;
-      refresh();
-    });
-    const yF = range("垂直位置", { min: 0, max: 100, step: 1, value: draft.posY, format: pct }, (v) => {
-      draft.posY = v;
-      refresh();
-    });
-    const resetComp = h("button.btn.btn--quiet.btn--sm", { type: "button" }, "重設構圖");
-    resetComp.addEventListener("click", () => {
-      draft.zoom = 1;
-      draft.posX = draft.posY = 50;
-      zoomF.set(1);
-      xF.set(50);
-      yF.set(50);
-      refresh();
-    });
+    segs.area = areaF;
+    const foilTune = h(
+      "div.tune",
+      slider("foilStrength", "強度", { min: 0, max: 200, step: 1, format: pct }),
+      slider("foilScale", "紋理大小", { min: 50, max: 200, step: 1, format: pct }),
+      slider("foilHue", "色調", { min: 0, max: 360, step: 1, format: deg })
+    );
 
     /* Foreground ------------------------------------------------------- */
     const fgInput = h("input.sr-only", { type: "file", accept: "image/png,image/webp", id: "fg-input" });
     const fgText = h("span");
     const fgLabel = h("label.btn.btn--line.btn--sm.file-btn", fgInput, fgText);
     const fgRemove = h("button.btn.btn--quiet.btn--sm", { type: "button" }, "移除前景");
+    const fgFoilF = segGroup("fgFoil", "前景鐳射", HC.FG_FOILS, draft.fgFoil, (v) => {
+      draft.fgFoil = v;
+      syncFoilFields();
+      refresh();
+    }, (o) => h("span.foil-pick__swatch", { "aria-hidden": "true", dataset: { foil: o.id } }));
+    fgFoilF.classList.add("field--foil");
+    segs.fgFoil = fgFoilF;
+    const fgFoilTune = h(
+      "div.tune",
+      slider("fgFoilStrength", "前景鐳射強度", { min: 0, max: 200, step: 1, format: pct }),
+      slider("fgFoilHue", "前景鐳射色調", { min: 0, max: 360, step: 1, format: deg })
+    );
+    const fgControls = h(
+      "div.fg-controls",
+      slider("fgZoom", "前景大小", { min: 0.5, max: 2, step: 0.01, format: times }),
+      slider("fgX", "前景左右", { min: -50, max: 50, step: 1, format: signed }),
+      slider("fgY", "前景上下", { min: -50, max: 50, step: 1, format: signed }),
+      fgFoilF,
+      fgFoilTune,
+      resetBtn("重設前景", ["fgZoom", "fgX", "fgY", "fgFoil", "fgFoilStrength", "fgFoilHue"])
+    );
+
+    function syncFoilFields() {
+      const hasFg = !!draft.fgBlob;
+      areaF.classList.toggle("is-off", draft.foil === "gloss");
+      foilTune.classList.toggle("is-off", draft.foil === "gloss");
+      fgFoilTune.classList.toggle("is-off", draft.fgFoil === "none");
+      fgControls.hidden = !hasFg;
+      blurF.classList.toggle("is-off", !hasFg);
+      blurNote.hidden = hasFg;
+      areaF.disable("frame", draft.frame === "none");
+    }
     const syncFg = () => {
       fgText.textContent = draft.fgBlob ? "更換前景圖" : "加入前景圖";
       fgRemove.hidden = !draft.fgBlob;
+      syncFoilFields();
     };
     fgInput.addEventListener("change", async () => {
       const file = fgInput.files[0];
@@ -232,35 +298,23 @@
       refresh();
     });
 
-    /* Foil -------------------------------------------------------------- */
-    const foilF = segGroup("foil", "鐳射樣式", HC.FOILS, draft.foil, (v) => {
-      draft.foil = v;
-      areaF.classList.toggle("is-off", v === "gloss");
-      refresh();
-    }, (o) => h("span.foil-pick__swatch", { "aria-hidden": "true", dataset: { foil: o.id } }));
-    foilF.classList.add("field--foil");
-    const areaF = segGroup("area", "鐳射範圍", HC.AREAS, draft.area, (v) => {
-      draft.area = v;
-      refresh();
-    });
-    areaF.classList.toggle("is-off", draft.foil === "gloss");
-    const frameF = segGroup("frame", "邊框", HC.FRAMES, draft.frame, (v) => {
+    /* Frame ------------------------------------------------------------- */
+    const frameF = segGroup("frame", "顏色", HC.FRAMES, draft.frame, (v) => {
       draft.frame = v;
-      areaF.disable("frame", v === "none");
       if (v === "none" && draft.area === "frame") {
         draft.area = "full";
         areaF.set("full");
       }
+      syncFoilFields();
       refresh();
     }, (o) => h("span.frame-chip", { "aria-hidden": "true", dataset: { frame: o.id } }));
-    areaF.disable("frame", draft.frame === "none");
 
     /* Save -------------------------------------------------------------- */
     const saveBtn = h("button.btn.btn--ink.btn--wide", { type: "submit" }, editing ? "儲存變更" : "儲存到展廳");
     const form = h(
       "form.maker__form",
       { novalidate: true },
-      h("div.maker__head", h("h1.maker__title", editing ? "編輯卡片" : "製作卡片"), h("p.maker__lead", "照片只在你的瀏覽器裡處理和儲存，不會上傳。")),
+      h("div.maker__head", h("h1.maker__title", editing ? "編輯卡片" : "製作卡片"), h("p.maker__lead", "照片在你的瀏覽器裡處理和儲存。只有按下「分享」的卡片才會上傳。")),
       h(
         "fieldset.group",
         h("legend.group__title", "照片"),
@@ -268,17 +322,26 @@
       ),
       h(
         "fieldset.group",
-        h("legend.group__title", "構圖"),
-        zoomF,
-        xF,
-        yF,
-        h("div.group__foot", resetComp)
+        h("legend.group__title", "背景照片"),
+        ...bgFields,
+        blurF,
+        blurNote,
+        resetBtn("重設背景", ["zoom", "posX", "posY", "bgBlur"])
+      ),
+      h(
+        "fieldset.group",
+        h("legend.group__title", "背景鐳射"),
+        foilF,
+        areaF,
+        foilTune,
+        resetBtn("重設鐳射數值", ["foilStrength", "foilScale", "foilHue"])
       ),
       h(
         "fieldset.group",
         h("legend.group__title", "前景圖層", h("span.group__opt", "選用")),
-        h("p.group__help", "一張去背的 PNG，會浮在照片上方。傾斜卡片時前後景分開移動，產生立體感。用和照片相同尺寸的圖，位置才會對齊。"),
-        h("div.group__row", fgLabel, fgRemove)
+        h("p.group__help", "一張去背的 PNG（例如照片裡的人物），會浮在照片上方，傾斜時前後景分開移動，產生立體感。前景可以有自己的鐳射和位置。"),
+        h("div.group__row", fgLabel, fgRemove),
+        fgControls
       ),
       h(
         "fieldset.group",
@@ -288,7 +351,7 @@
         serialField,
         h("label.check", showText, h("span", "在卡片上顯示文字"))
       ),
-      h("fieldset.group", h("legend.group__title", "鐳射與邊框"), foilF, areaF, frameF),
+      h("fieldset.group", h("legend.group__title", "邊框"), frameF),
       h(
         "div.maker__actions",
         saveBtn,

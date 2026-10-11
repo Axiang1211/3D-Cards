@@ -118,6 +118,16 @@
       return clean.id;
     },
 
+    /** Change a few fields without marking the card as edited. */
+    async patch(id, fields) {
+      const db = await open();
+      const rec = db ? await tx(db, "readonly", (s) => reqP(s.get(id))) : memory.get(id);
+      if (!rec) return;
+      Object.assign(rec, fields);
+      if (!db) memory.set(id, rec);
+      else await tx(db, "readwrite", (s) => reqP(s.put(rec)));
+    },
+
     async remove(id) {
       ["bg", "fg"].forEach((k) => {
         const hit = urlCache.get(id + ":" + k);
