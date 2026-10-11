@@ -40,20 +40,21 @@
 
 這組用戶端 ID 是公開的，放在程式碼裡沒有關係。
 
-## 4. 電腦版用的用戶端 ID
+## 4. 電腦版登入用的設定
 
-Google 不允許在 App 的內嵌視窗裡登入，所以電腦版改用「輸入代碼」的方式：App 顯示一組代碼，使用者在瀏覽器打開 google.com/device 輸入。
+Google 不允許在 App 的內嵌視窗裡登入，所以電腦版按「用 Google 登入」時，會用使用者平常的瀏覽器打開網站的登入頁。頁面上會顯示和電腦版相同的確認碼，核對後再登入 Google，完成後電腦版會自動取得授權。這用的是第 3 步那一組「網站」用戶端，需要再補兩個設定：
 
-1. **憑證** → **建立憑證** → **OAuth 用戶端 ID**
-2. 應用程式類型選 **電視和受限輸入裝置**，名稱填 `3D Cards 電腦版`，按 **建立**
-3. 複製 **用戶端 ID** 和 **用戶端密鑰**
-4. 打開 Cloudflare 控制台 → **Workers & Pages** → 你的專案 → **Settings** → **Variables and Secrets**
-5. 按 **Add**，Type 選 **Secret**，新增兩筆：
-   - 名稱 `GOOGLE_DEVICE_CLIENT_ID`，值貼用戶端 ID
-   - 名稱 `GOOGLE_DEVICE_CLIENT_SECRET`，值貼用戶端密鑰
-6. 按 **Deploy**（或 Save and deploy）
+1. Google Cloud → **Clients** → 點 **3D Cards 網站**
+2. 在 **Authorized redirect URIs** 按 **Add URI**，填：
+   `https://3dcards.app.dreamsworld.top/api/google/callback`
+   按 **Save**
+3. 同一頁右側的 **Client secrets**，複製 `GOCSPX-` 開頭的密鑰（看不到的話按 **Add secret** 新增一組）
+4. Cloudflare 控制台 → **Workers & Pages** → 你的專案 → **設定** → **變數和祕密**（執行時變數與機密）→ **新增變數**：
+   - 金鑰：`GOOGLE_WEB_CLIENT_SECRET`
+   - 值：剛才複製的密鑰
+   - 勾選 **秘密**，按 **新增變數並部署**
 
-用戶端密鑰只放在 Cloudflare，不會出現在程式碼或 exe 裡。
+用戶端密鑰只放在 Cloudflare，不會出現在程式碼或 exe 裡。網站用戶端的 ID 已經寫在 `wrangler.jsonc` 的 `GOOGLE_WEB_CLIENT_ID`，換用戶端時要一起改。
 
 ---
 

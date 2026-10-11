@@ -8,9 +8,9 @@
  *
  *  - Website: Google Identity Services pop-up (needs HC_CONFIG.googleClientId).
  *  - Desktop app: Google does not allow sign-in inside an app window, so it uses
- *    the "device code" flow: the user opens google.com/device and types a code.
- *    The code exchange goes through the site's Worker (/api/google/*), which holds
- *    the desktop client secret.
+ *    the user's normal browser: the app opens the website's sign-in page, the user
+ *    checks a code and signs in, and the app collects the result through the
+ *    site's Worker (/api/google/*), which holds the client secret.
  *
  * Sync rules: the newer copy of each card wins; cards deleted here are deleted in
  * the cloud on the next sync.
@@ -90,7 +90,7 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* Sign-in: desktop app (device code, through the Worker)              */
+  /* Sign-in: desktop app (browser pairing, through the Worker)          */
   /* ------------------------------------------------------------------ */
   async function workerPost(path, body) {
     let res;
@@ -120,27 +120,26 @@
     return token;
   }
 
-  /** Shows the code, opens google.com/device, waits until the user approves. */
+  /** Opens the website in the user's browser to sign in, shows the check code, waits for the result. */
   async function desktopSignIn(view) {
-    const start = await workerPost("/api/google/device", {});
-    if (!start.device_code) throw new Error(HC.t(start.error_message || "電腦版的 Google 登入還沒設定好。"));
-    const url = start.verification_url || start.verification_uri || "https://www.google.com/device";
-    view.showCode(start.user_code, url);
-    let wait = (start.interval || 5) * 1000;
-    const until = Date.now() + (start.expires_in || 1800) * 1000;
+    const start = await workerPost("/api/google/pair", {});
+    if (!start.id) throw new Error(HC.t(start.error_message || "電腦版的 Google 登入還沒設定好。"));
+    view.showCode(start.code, start.url);
+    if (window.HC_DESKTOP && window.HC_DESKTOP.openUrl) window.HC_DESKTOP.openUrl(start.url);
+    const until = Date.now() + (start.expires_in || 600) * 1000;
     while (Date.now() < until) {
-      await new Promise((r) => setTimeout(r, wait));
+      await new Promise((r) => setTimeout(r, 2500));
       if (view.cancelled) throw new Error("cancelled");
-      const data = await workerPost("/api/google/token", { device_code: start.device_code });
+      const data = await workerPost("/api/google/claim", { id: start.id, secret: start.secret });
       if (data.access_token) {
         if (data.refresh_token) ls.set(K_REFRESH, data.refresh_token);
         token = { access: data.access_token, expires: Date.now() + ((data.expires_in || 3600) - 60) * 1000 };
         return token;
       }
-      if (data.error === "slow_down") wait += 5000;
-      else if (data.error !== "authorization_pending") throw new Error(HC.t("Google 登入沒有完成。"));
+      if (data.error === "expired") break;
+      if (data.error && data.error !== "authorization_pending") throw new Error(HC.t("Google 登入沒有完成。"));
     }
-    throw new Error(HC.t("代碼已經過期，請重新登入。"));
+    throw new Error(HC.t("登入連結已經過期，請重新登入。"));
   }
 
   /* ------------------------------------------------------------------ */
@@ -370,17 +369,16 @@
           view.showCode = (code, url) => {
             const codeEl = h("p.cloud-code", code);
             body.replaceChildren(
-              h("p.share__note", HC.t("在瀏覽器打開下面的網址，登入 Google 後輸入這組代碼：")),
+              h("p.share__note", HC.t("已經用你的瀏覽器打開登入頁。請確認頁面上的確認碼和這裡一樣，再用 Google 登入：")),
               codeEl,
               h(
                 "div.share__actions",
-                h("a.btn.btn--ink", { href: url, target: "_blank", rel: "noopener" }, HC.t("打開 Google 登入頁")),
+                h("a.btn.btn--ink", { href: url, target: "_blank", rel: "noopener" }, HC.t("重新打開登入頁")),
                 h("button.btn.btn--quiet", { type: "button", onclick: close }, HC.t("取消"))
               ),
-              h("p.share__note", url),
               status
             );
-            status.textContent = HC.t("輸入代碼後，這裡會自動完成登入…");
+            status.textContent = HC.t("在瀏覽器登入後，這裡會自動完成…");
           };
           await desktopSignIn(view);
         } else {

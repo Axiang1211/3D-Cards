@@ -71,7 +71,7 @@ async function api(request, env, url) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (!env.SHARES && !url.pathname.startsWith("/api/google/")) return json({ error: "這個網站沒有開啟分享功能。" }, 501);
 
-  if (url.pathname.startsWith("/api/google/") && request.method === "POST") return google(request, env, url.pathname.slice(12));
+  if (url.pathname.startsWith("/api/google/")) return google(request, env, url.pathname.slice(12), url);
   if (url.pathname === "/api/shares" && request.method === "POST") return createShare(request, env, url);
 
   const m = url.pathname.match(/^\/api\/shares\/([A-Za-z0-9]+)(\/image)?$/);
@@ -192,51 +192,127 @@ async function deleteShare(request, env, id) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Google sign-in for the desktop app (device code flow)               */
-/* Google does not allow sign-in inside app windows, so the app shows  */
-/* a code the user enters at google.com/device. The client secret of   */
-/* the "TVs and Limited Input devices" client stays here, as Worker    */
-/* secrets GOOGLE_DEVICE_CLIENT_ID and GOOGLE_DEVICE_CLIENT_SECRET.    */
+/* Google sign-in for the desktop app                                  */
+/* Google does not allow sign-in inside app windows, so the app asks   */
+/* for a pairing, opens the user's browser at /api/google/start, the   */
+/* user checks the code and signs in with Google, and the app collects */
+/* the tokens with the pairing secret it kept.                          */
+/* Needs: GOOGLE_WEB_CLIENT_ID (wrangler.jsonc) and the Worker secret   */
+/* GOOGLE_WEB_CLIENT_SECRET; redirect URI /api/google/callback.         */
 /* ------------------------------------------------------------------ */
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/drive.appdata openid email";
+const PAIR_TTL = 600;
 
-async function google(request, env, action) {
-  const id = env.GOOGLE_DEVICE_CLIENT_ID;
-  const secret = env.GOOGLE_DEVICE_CLIENT_SECRET;
-  if (!id || !secret) return json({ error: "not_configured", error_message: "電腦版的 Google 登入還沒設定好。" }, 501);
-  let body = {};
-  try {
-    body = await request.json();
-  } catch {}
-  const form = (o) => new URLSearchParams(o);
-  let endpoint, params;
-  if (action === "device") {
-    endpoint = "https://oauth2.googleapis.com/device/code";
-    params = form({ client_id: id, scope: GOOGLE_SCOPE });
-  } else if (action === "token") {
-    if (typeof body.device_code !== "string") return json({ error: "invalid_request" }, 400);
-    endpoint = "https://oauth2.googleapis.com/token";
-    params = form({
-      client_id: id,
-      client_secret: secret,
-      device_code: body.device_code,
-      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-    });
-  } else if (action === "refresh") {
-    if (typeof body.refresh_token !== "string") return json({ error: "invalid_request" }, 400);
-    endpoint = "https://oauth2.googleapis.com/token";
-    params = form({ client_id: id, client_secret: secret, refresh_token: body.refresh_token, grant_type: "refresh_token" });
-  } else {
-    return json({ error: "not_found" }, 404);
+async function google(request, env, action, url) {
+  const id = env.GOOGLE_WEB_CLIENT_ID;
+  const secret = env.GOOGLE_WEB_CLIENT_SECRET;
+  if (!id || !secret || !env.SHARES) {
+    return action === "start" || action === "callback"
+      ? page2("電腦版的 Google 登入還沒設定好。", "Google sign-in for the desktop app isn't set up yet.")
+      : json({ error: "not_configured", error_message: "電腦版的 Google 登入還沒設定好。" }, 501);
   }
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params,
+  const redirect = url.origin + "/api/google/callback";
+  const tokenRequest = (params) =>
+    fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(Object.assign({ client_id: id, client_secret: secret }, params)),
+    }).then((r) => r.json().catch(() => ({ error: "bad_response" })));
+
+  // 1. The app asks for a pairing.
+  if (action === "pair" && request.method === "POST") {
+    const pair = randomId(24);
+    const key = randomId(32);
+    const code = randomId(6).toUpperCase();
+    await env.SHARES.put("p:" + pair, JSON.stringify({ status: "waiting", code, keyHash: await sha256(key) }), { expirationTtl: PAIR_TTL });
+    return json({ id: pair, secret: key, code, url: `${url.origin}/api/google/start?pair=${pair}`, expires_in: PAIR_TTL });
+  }
+
+  // 2. The browser: check the code, then go to Google.
+  if (action === "start" && request.method === "GET") {
+    const pair = url.searchParams.get("pair") || "";
+    const rec = /^[A-Za-z0-9]{24}$/.test(pair) && (await env.SHARES.get("p:" + pair, { type: "json" }));
+    if (!rec || rec.status !== "waiting") return page2("這個登入連結已經過期，請回到 3D Cards 電腦版重新按「用 Google 登入」。", "This sign-in link has expired. Go back to the 3D Cards app and press “Sign in with Google” again.");
+    const go = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    go.search = new URLSearchParams({
+      client_id: id,
+      redirect_uri: redirect,
+      response_type: "code",
+      scope: GOOGLE_SCOPE,
+      access_type: "offline",
+      prompt: "consent",
+      state: pair,
+    }).toString();
+    return page2(
+      `請確認 3D Cards 電腦版上顯示的確認碼是：<b class="code">${rec.code}</b>一樣的話再繼續。如果你沒有在電腦版按登入，請關掉這個頁面。`,
+      `Check that the 3D Cards app shows this code: <b class="code">${rec.code}</b>Only continue if it matches. If you didn't press sign-in in the app, close this page.`,
+      { href: go.toString(), zh: "代碼一樣，用 Google 登入", en: "The code matches — sign in with Google" }
+    );
+  }
+
+  // 3. Google sends the browser back here with a code.
+  if (action === "callback" && request.method === "GET") {
+    const pair = url.searchParams.get("state") || "";
+    const rec = /^[A-Za-z0-9]{24}$/.test(pair) && (await env.SHARES.get("p:" + pair, { type: "json" }));
+    if (!rec || rec.status !== "waiting") return page2("這個登入連結已經過期，請回到 3D Cards 電腦版重新登入。", "This sign-in link has expired. Sign in again from the 3D Cards app.");
+    const code = url.searchParams.get("code");
+    if (!code) return page2("登入沒有完成，可以回到 3D Cards 電腦版再試一次。", "Sign-in wasn't completed. You can try again from the 3D Cards app.");
+    const tokens = await tokenRequest({ code, redirect_uri: redirect, grant_type: "authorization_code" });
+    if (!tokens.access_token) return page2("Google 沒有完成登入，請回到 3D Cards 電腦版再試一次。", "Google didn't complete the sign-in. Please try again from the 3D Cards app.");
+    await env.SHARES.put("p:" + pair, JSON.stringify(Object.assign(rec, { status: "done", tokens })), { expirationTtl: 300 });
+    return page2("登入完成！現在可以關掉這個頁面，回到 3D Cards 電腦版。", "Signed in! You can close this page and go back to the 3D Cards app.");
+  }
+
+  // 4. The app collects the tokens (once), proving it started the pairing.
+  if (action === "claim" && request.method === "POST") {
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {}
+    const pair = String(body.id || "");
+    const rec = /^[A-Za-z0-9]{24}$/.test(pair) && (await env.SHARES.get("p:" + pair, { type: "json" }));
+    if (!rec) return json({ error: "expired" });
+    if ((await sha256(String(body.secret || ""))) !== rec.keyHash) return json({ error: "forbidden" }, 403);
+    if (rec.status !== "done") return json({ error: "authorization_pending" });
+    await env.SHARES.delete("p:" + pair);
+    return json(rec.tokens);
+  }
+
+  // 5. The app refreshes its access token.
+  if (action === "refresh" && request.method === "POST") {
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {}
+    if (typeof body.refresh_token !== "string") return json({ error: "invalid_request" }, 400);
+    return json(await tokenRequest({ refresh_token: body.refresh_token, grant_type: "refresh_token" }));
+  }
+
+  return json({ error: "not_found" }, 404);
+}
+
+/** A small bilingual page shown in the browser during desktop sign-in. */
+function page2(zh, en, button) {
+  const btn = button
+    ? `<a class="btn" href="${button.href.replace(/"/g, "&quot;")}">${button.zh}<br><small>${button.en}</small></a>`
+    : "";
+  const html = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3D Cards</title><link rel="icon" href="/brand/logo-mark-64.png">
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101116;color:#eceef2;font:16px/1.6 system-ui,"Noto Sans TC",sans-serif}
+main{max-width:460px;padding:32px 24px;text-align:center}img{width:96px;height:96px}p{margin:16px 0}.en{color:#959ba6;font-size:14px}
+.code{display:block;margin:14px auto;font-size:34px;letter-spacing:.14em;padding:10px;border-radius:12px;background:#1c1e26}
+.btn{display:inline-block;margin-top:16px;padding:14px 26px;border-radius:999px;background:#eceef2;color:#101116;text-decoration:none;font-weight:600;line-height:1.3}
+.btn small{font-weight:400;color:#5b6069}</style></head>
+<body><main><img src="/brand/logo-mark-192.png" alt=""><p>${zh}</p><p class="en">${en}</p>${btn}</main></body></html>`;
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+      "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'",
+    },
   });
-  const data = await res.json().catch(() => ({ error: "bad_response" }));
-  // Pass Google's answer through (authorization_pending etc. are normal while waiting).
-  return json(data, res.ok ? 200 : 200);
 }
 
 /* ------------------------------------------------------------------ */

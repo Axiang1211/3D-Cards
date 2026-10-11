@@ -14,5 +14,10 @@
   },
   // Storage for shared cards. Cloudflare creates it automatically on the first deploy
   // and reuses it on later deploys (matched by the binding name).
-  "kv_namespaces": [{ "binding": "SHARES" }]
+  "kv_namespaces": [{ "binding": "SHARES" }],
+  // Public ID of the Google "Web application" client (same as googleClientId in public/js/config.js).
+  // Its secret is set in Cloudflare as the secret GOOGLE_WEB_CLIENT_SECRET.
+  "vars": {
+    "GOOGLE_WEB_CLIENT_ID": "210055593962-3ajro5cogq75030114aqmh737itftgcl.apps.googleusercontent.com"
+  }
 }

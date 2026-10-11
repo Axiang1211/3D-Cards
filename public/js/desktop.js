@@ -127,6 +127,7 @@
 
   window.HC_DESKTOP = {
     version: appVersion,
+    openUrl: (url) => openUrl(url).catch(() => {}),
     checkForUpdates: () => checkForUpdates(true),
   };
 
