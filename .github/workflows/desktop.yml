@@ -54,6 +54,6 @@ jobs:
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             # Show the end of the log on the run's summary page.
-            tail -n 25 build.log | sed -e 's/%/%25/g' -e 's/^/::error::/'
+            { grep -nE "⨯|[Ee]rror|message|status|HttpError|publish|upload" build.log | grep -v '"x-' | tail -n 30; } | sed -e 's/%/%25/g' -e 's/^/::error::/'
             exit "$status"
           fi
