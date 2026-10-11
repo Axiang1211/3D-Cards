@@ -84,16 +84,6 @@
 > 直接雙擊開啟時，示範卡片無法使用「下載卡片檔」，其他功能都正常。
 > 如果你的電腦有 Python，可以在專案資料夾執行 `python3 -m http.server 8000 --directory public`，再打開 http://localhost:8000 ，所有功能都能用。
 
-### 放到自己的網站
-
-整個網站就是 `public` 資料夾裡的檔案，不需要資料庫或後端。把 `public` 裡的東西上傳到任何能放靜態網頁的地方（自己的主機、GitHub Pages、Netlify、Cloudflare 等），就能有一份自己的 3D Cards。
-
-上傳前可以先打開 `public/js/config.js` 修改：
-
-- `siteName`：網站名稱，會顯示在左上角和卡片背面
-- `repoUrl`：網頁最下方「在 GitHub 查看原始碼」的連結，留空 `""` 就不顯示
-- `featured`：首頁的大卡片要放哪一張
-
 ---
 
 ## 給想修改程式的人
