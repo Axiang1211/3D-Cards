@@ -17,8 +17,8 @@
  */
 
 const SHARE_DAYS = 14; // shared cards are deleted automatically after this many days
-const MAX_BODY = 7 * 1024 * 1024; // request size limit
-const MAX_IMAGES = 5 * 1024 * 1024; // decoded photo + foreground
+const MAX_BODY = 12 * 1024 * 1024; // request size limit
+const MAX_IMAGES = 8 * 1024 * 1024; // decoded photo + foreground
 const ID_RE = /^[A-Za-z0-9]{8,12}$/;
 const IMAGE_RE = /^data:(image\/(?:webp|jpeg|png));base64,([A-Za-z0-9+/=]+)$/;
 const FOILS = ["rainbow", "stardust", "prism", "metal", "gloss"];
@@ -31,8 +31,11 @@ const SECURITY_HEADERS = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "accelerometer=(self), gyroscope=(self), magnetometer=(self), camera=(), microphone=(), geolocation=()",
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-    "font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' data: blob:; " +
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://accounts.google.com; " +
+    "frame-src https://accounts.google.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src https://fonts.gstatic.com; img-src 'self' data: blob:; " +
+    "connect-src 'self' data: blob: https://cdn.jsdelivr.net https://accounts.google.com https://www.googleapis.com https://openidconnect.googleapis.com https://oauth2.googleapis.com; " +
     "object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
 };
 
@@ -66,8 +69,9 @@ export default {
 /* ------------------------------------------------------------------ */
 async function api(request, env, url) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
-  if (!env.SHARES) return json({ error: "這個網站沒有開啟分享功能。" }, 501);
+  if (!env.SHARES && !url.pathname.startsWith("/api/google/")) return json({ error: "這個網站沒有開啟分享功能。" }, 501);
 
+  if (url.pathname.startsWith("/api/google/") && request.method === "POST") return google(request, env, url.pathname.slice(12));
   if (url.pathname === "/api/shares" && request.method === "POST") return createShare(request, env, url);
 
   const m = url.pathname.match(/^\/api\/shares\/([A-Za-z0-9]+)(\/image)?$/);
@@ -82,12 +86,12 @@ async function api(request, env, url) {
 
 async function createShare(request, env, url) {
   const len = Number(request.headers.get("content-length") || 0);
-  if (len > MAX_BODY) return json({ error: "卡片太大了，照片請小於 5 MB。" }, 413);
+  if (len > MAX_BODY) return json({ error: "卡片太大了，請換小一點的照片。" }, 413);
 
   let body;
   try {
     const text = await request.text();
-    if (text.length > MAX_BODY) return json({ error: "卡片太大了，照片請小於 5 MB。" }, 413);
+    if (text.length > MAX_BODY) return json({ error: "卡片太大了，請換小一點的照片。" }, 413);
     body = JSON.parse(text);
   } catch {
     return json({ error: "資料格式不正確。" }, 400);
@@ -106,7 +110,7 @@ async function createShare(request, env, url) {
     size += b64size(f[2]);
     fg = c.fg;
   }
-  if (size > MAX_IMAGES) return json({ error: "卡片太大了，照片請小於 5 MB。" }, 413);
+  if (size > MAX_IMAGES) return json({ error: "卡片太大了，請換小一點的照片。" }, 413);
 
   const card = {
     title: str(c.title, 40),
@@ -128,6 +132,8 @@ async function createShare(request, env, url) {
     fgFoil: pick(c.fgFoil, FG_FOILS, "none"),
     fgFoilStrength: num(c.fgFoilStrength, 100, 0, 200),
     fgFoilHue: num(c.fgFoilHue, 0, 0, 360),
+    sand: c.sand === true,
+    sandColor: /^#[0-9a-fA-F]{6}$/.test(c.sandColor || "") ? String(c.sandColor).toLowerCase() : "#ffd26e",
     showText: c.showText !== false,
     image: c.image,
     fg,
@@ -183,6 +189,54 @@ async function deleteShare(request, env, id) {
   if (!isOwner && !isAdmin) return json({ error: "沒有權限刪除這張卡片。" }, 403);
   await env.SHARES.delete("s:" + id);
   return json({ ok: true }, 200);
+}
+
+/* ------------------------------------------------------------------ */
+/* Google sign-in for the desktop app (device code flow)               */
+/* Google does not allow sign-in inside app windows, so the app shows  */
+/* a code the user enters at google.com/device. The client secret of   */
+/* the "TVs and Limited Input devices" client stays here, as Worker    */
+/* secrets GOOGLE_DEVICE_CLIENT_ID and GOOGLE_DEVICE_CLIENT_SECRET.    */
+/* ------------------------------------------------------------------ */
+const GOOGLE_SCOPE = "https://www.googleapis.com/auth/drive.appdata openid email";
+
+async function google(request, env, action) {
+  const id = env.GOOGLE_DEVICE_CLIENT_ID;
+  const secret = env.GOOGLE_DEVICE_CLIENT_SECRET;
+  if (!id || !secret) return json({ error: "not_configured", error_message: "電腦版的 Google 登入還沒設定好。" }, 501);
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {}
+  const form = (o) => new URLSearchParams(o);
+  let endpoint, params;
+  if (action === "device") {
+    endpoint = "https://oauth2.googleapis.com/device/code";
+    params = form({ client_id: id, scope: GOOGLE_SCOPE });
+  } else if (action === "token") {
+    if (typeof body.device_code !== "string") return json({ error: "invalid_request" }, 400);
+    endpoint = "https://oauth2.googleapis.com/token";
+    params = form({
+      client_id: id,
+      client_secret: secret,
+      device_code: body.device_code,
+      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+    });
+  } else if (action === "refresh") {
+    if (typeof body.refresh_token !== "string") return json({ error: "invalid_request" }, 400);
+    endpoint = "https://oauth2.googleapis.com/token";
+    params = form({ client_id: id, client_secret: secret, refresh_token: body.refresh_token, grant_type: "refresh_token" });
+  } else {
+    return json({ error: "not_found" }, 404);
+  }
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params,
+  });
+  const data = await res.json().catch(() => ({ error: "bad_response" }));
+  // Pass Google's answer through (authorization_pending etc. are normal while waiting).
+  return json(data, res.ok ? 200 : 200);
 }
 
 /* ------------------------------------------------------------------ */

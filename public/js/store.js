@@ -118,6 +118,18 @@
       return clean.id;
     },
 
+    /** Save a record exactly as given (id and dates kept), used by cloud sync. */
+    async putRaw(rec) {
+      const clean = Object.assign({}, rec);
+      delete clean.image;
+      delete clean.fg;
+      delete clean.own;
+      const db = await open();
+      if (!db) memory.set(clean.id, clean);
+      else await tx(db, "readwrite", (s) => reqP(s.put(clean)));
+      return clean.id;
+    },
+
     /** Change a few fields without marking the card as edited. */
     async patch(id, fields) {
       const db = await open();

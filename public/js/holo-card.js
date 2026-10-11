@@ -13,29 +13,32 @@
 (function () {
   "use strict";
   const HC = (window.HC = window.HC || {});
+  // Text goes through the site's translator when there is one (js/i18n.js).
+  const T = (str, params) =>
+    HC.t ? HC.t(str, params) : str.replace(/\{(\w+)\}/g, (m, k) => (params && k in params ? params[k] : m));
 
   HC.FOILS = [
-    { id: "rainbow", name: "彩虹" },
-    { id: "stardust", name: "星塵" },
-    { id: "prism", name: "稜鏡" },
-    { id: "metal", name: "流光" },
-    { id: "gloss", name: "亮面" },
+    { id: "rainbow", name: T("彩虹") },
+    { id: "stardust", name: T("星塵") },
+    { id: "prism", name: T("稜鏡") },
+    { id: "metal", name: T("流光") },
+    { id: "gloss", name: T("亮面") },
   ];
   HC.AREAS = [
-    { id: "full", name: "整張" },
-    { id: "art", name: "只有照片" },
-    { id: "frame", name: "只有邊框" },
+    { id: "full", name: T("整張") },
+    { id: "art", name: T("只有照片") },
+    { id: "frame", name: T("只有邊框") },
   ];
   HC.FRAMES = [
-    { id: "none", name: "無邊框" },
-    { id: "white", name: "白" },
-    { id: "black", name: "黑" },
-    { id: "silver", name: "銀" },
-    { id: "gold", name: "金" },
+    { id: "none", name: T("無邊框") },
+    { id: "white", name: T("白") },
+    { id: "black", name: T("黑") },
+    { id: "silver", name: T("銀") },
+    { id: "gold", name: T("金") },
   ];
   HC.foilName = (id) => (HC.FOILS.find((f) => f.id === id) || HC.FOILS[0]).name;
 
-  HC.FG_FOILS = [{ id: "none", name: "無" }].concat(HC.FOILS.filter((f) => f.id !== "gloss"));
+  HC.FG_FOILS = [{ id: "none", name: T("無") }].concat(HC.FOILS.filter((f) => f.id !== "gloss"));
 
   HC.DEFAULTS = {
     title: "",
@@ -63,6 +66,9 @@
     fgFoil: "none",
     fgFoilStrength: 100,
     fgFoilHue: 0,
+    // quicksand between the photo and the foreground (needs a foreground)
+    sand: false,
+    sandColor: "#ffd26e",
   };
 
   /** Clamp every numeric field into its valid range. */
@@ -86,6 +92,8 @@
       fgFoil: pick(c.fgFoil, HC.FG_FOILS, "none"),
       fgFoilStrength: n(c.fgFoilStrength, 100, 0, 200),
       fgFoilHue: n(c.fgFoilHue, 0, 0, 360),
+      sand: c.sand === true || c.sand === "true",
+      sandColor: /^#[0-9a-f]{6}$/i.test(c.sandColor || "") ? String(c.sandColor).toLowerCase() : "#ffd26e",
     };
   };
 
@@ -125,6 +133,172 @@
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+  /* ------------------------------------------------------------------ */
+  /* Sand: a falling-sand grid for the quicksand layer.                   */
+  /* Each cell is empty (0) or a grain (1..255 = its shade; >= 248 glints) */
+  /* Gravity can point in any of 8 directions; grains fall, slide down    */
+  /* slopes and level out a little like sand in liquid.                  */
+  /* ------------------------------------------------------------------ */
+  const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+
+  class Sand {
+    constructor(canvas) {
+      this.c = canvas;
+      this.ctx = canvas.getContext("2d");
+      this.W = this.H = 0;
+      this.rgb = [255, 210, 110];
+      this.dir = 2; // index into DIRS: straight down
+      this.strength = 1;
+      this.quiet = 0;
+      this.stamp = 1;
+      this.dirty = true;
+    }
+    resize(w, h) {
+      if (w === this.W && h === this.H) return;
+      this.W = w;
+      this.H = h;
+      const n = w * h;
+      this.grid = new Uint8Array(n);
+      this.moved = new Uint8Array(n);
+      this.c.width = w;
+      this.c.height = h;
+      this.img = this.ctx.createImageData(w, h);
+      this.px = new Uint32Array(this.img.data.buffer);
+      this.fill();
+    }
+    /** Half of the window, settled on the side gravity points to. */
+    fill() {
+      const { W, H, grid } = this;
+      grid.fill(0);
+      let left = Math.floor(W * H * 0.5);
+      let seed = 7;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (let y = H - 1; y >= 0 && left > 0; y--) {
+        for (let x = 0; x < W && left > 0; x++) {
+          const shade = rnd() < 0.035 ? 248 + Math.floor(rnd() * 8) : 1 + Math.floor(rnd() * 240);
+          grid[y * W + x] = shade;
+          left--;
+        }
+      }
+      this.quiet = 0;
+      this.dirty = true;
+    }
+    setColor(hex) {
+      const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+      const v = m ? parseInt(m[1], 16) : 0xffd26e;
+      this.rgb = [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+      this.dirty = true;
+    }
+    /** gx, gy: gravity in grid space. Returns true while grains still move. */
+    setGravity(gx, gy) {
+      const m = Math.hypot(gx, gy);
+      const dir = ((Math.round(Math.atan2(gy, gx) / (Math.PI / 4)) % 8) + 8) % 8;
+      const strength = m < 0.22 ? 0 : Math.min(1, m);
+      if (dir !== this.dir || (strength > 0) !== (this.strength > 0)) this.quiet = 0;
+      this.dir = dir;
+      this.strength = strength;
+    }
+    get asleep() {
+      return this.quiet > 2;
+    }
+    step() {
+      if (!this.W || this.strength === 0) {
+        this.quiet = 3;
+        return false;
+      }
+      const { W, H, grid, moved } = this;
+      const stamp = (this.stamp = (this.stamp % 250) + 1);
+      const [dx, dy] = DIRS[this.dir];
+      const diagA = DIRS[(this.dir + 1) % 8];
+      const diagB = DIRS[(this.dir + 7) % 8];
+      const sideA = DIRS[(this.dir + 2) % 8];
+      const sideB = DIRS[(this.dir + 6) % 8];
+      const p = 0.55 + 0.35 * this.strength; // grains in liquid fall a bit lazily
+      const flipX = dx === 0 ? stamp & 1 : 0;
+      const xs = dx > 0 || (dx === 0 && flipX) ? -1 : 1;
+      const ys = dy > 0 ? -1 : 1;
+      const x0 = xs < 0 ? W - 1 : 0;
+      const y0 = ys < 0 ? H - 1 : 0;
+      const free = (x, y) => x >= 0 && y >= 0 && x < W && y < H && grid[y * W + x] === 0;
+      let count = 0;
+      for (let j = 0, y = y0; j < H; j++, y += ys) {
+        for (let i = 0, x = x0; i < W; i++, x += xs) {
+          const k = y * W + x;
+          const v = grid[k];
+          if (!v || moved[k] === stamp) continue;
+          if (Math.random() > p) {
+            // resting this frame, but still counts as active if it could fall
+            if (free(x + dx, y + dy)) count++;
+            continue;
+          }
+          let tx = -1, ty = -1;
+          if (free(x + dx, y + dy)) {
+            tx = x + dx;
+            ty = y + dy;
+          } else {
+            const first = Math.random() < 0.5 ? diagA : diagB;
+            const second = first === diagA ? diagB : diagA;
+            if (free(x + first[0], y + first[1])) {
+              tx = x + first[0];
+              ty = y + first[1];
+            } else if (free(x + second[0], y + second[1])) {
+              tx = x + second[0];
+              ty = y + second[1];
+            } else if (Math.random() < 0.35) {
+              // Slide sideways only towards a spot it can then fall from: levels the surface, always settles.
+              const side = Math.random() < 0.5 ? sideA : sideB;
+              const sx = x + side[0], sy = y + side[1];
+              if (free(sx, sy) && free(sx + dx, sy + dy)) {
+                tx = sx;
+                ty = sy;
+              }
+            }
+          }
+          if (tx >= 0) {
+            const t = ty * W + tx;
+            grid[t] = v;
+            grid[k] = 0;
+            moved[t] = stamp;
+            count++;
+          }
+        }
+      }
+      if (count) {
+        this.quiet = 0;
+        this.dirty = true;
+      } else this.quiet++;
+      return !this.asleep;
+    }
+    draw() {
+      if (!this.dirty || !this.W) return;
+      this.dirty = false;
+      const { grid, px } = this;
+      const [r, g, b] = this.rgb;
+      for (let k = 0; k < grid.length; k++) {
+        const v = grid[k];
+        if (!v) {
+          px[k] = 0;
+          continue;
+        }
+        let R, G, B;
+        if (v >= 248) {
+          // glint: mostly white
+          R = 255 - ((255 - r) >> 3);
+          G = 255 - ((255 - g) >> 3);
+          B = 255 - ((255 - b) >> 3);
+        } else {
+          const f = 0.68 + (v / 240) * 0.45;
+          R = Math.min(255, r * f) | 0;
+          G = Math.min(255, g * f) | 0;
+          B = Math.min(255, b * f) | 0;
+        }
+        px[k] = (255 << 24) | (B << 16) | (G << 8) | R;
+      }
+      this.ctx.putImageData(this.img, 0, 0);
+    }
+  }
+  HC.Sand = Sand;
+
   class HoloCard {
     /**
      * @param {object} data   card content (see top of file)
@@ -157,8 +331,10 @@
         o: new HC.Spring(this.opts.restFoil, { stiffness: 0.05, damping: 0.3 }),
         lift: new HC.Spring(1, { stiffness: 0.08, damping: 0.3 }),
         flip: new HC.Spring(0, { stiffness: 0.045, damping: 0.16 }),
+        rot: new HC.Spring(0, { stiffness: 0.03, damping: 0.2 }),
       };
 
+      this._sandTick = this._sandTick.bind(this);
       this._build();
       this.setData(this.data);
       this._write();
@@ -182,6 +358,9 @@
       const bg = el("img", "hc__bg", art);
       // Background foil inside the photo window, under the foreground.
       const artFoil = [el("div", "hc__foil hc__foil--art hc__foil--dodge", art), el("div", "hc__foil hc__foil--art hc__foil--screen", art)];
+      // Quicksand, between the photo and the foreground.
+      const sandCanvas = el("canvas", "hc__sand", art);
+      sandCanvas.hidden = true;
       const fg = el("img", "hc__fg", art);
       // Foreground foil: same box as the foreground, masked to its shape.
       const fgFoil = [el("div", "hc__foil hc__foil--fg hc__foil--dodge", art), el("div", "hc__foil hc__foil--fg hc__foil--screen", art)];
@@ -215,7 +394,7 @@
 
       fg.addEventListener("error", () => (fg.hidden = true));
       this.el = root;
-      this.n = { shadow, tilt, flip, front, art, bg, fg, text, title, sub, serial, backSerial, artFoil, fgFoil, frameFoil, backFoil };
+      this.n = { shadow, tilt, flip, front, art, bg, fg, text, title, sub, serial, backSerial, artFoil, fgFoil, frameFoil, backFoil, sandCanvas };
     }
 
     /** Replace the card's content without rebuilding it. */
@@ -258,6 +437,23 @@
       paint(n.frameFoil, v.foil, v.foilStrength, v.foilScale, v.foilHue, bgOn && frame !== "none" && (area === "full" || area === "frame"));
       paint(n.fgFoil, v.fgFoil, v.fgFoilStrength, v.foilScale, v.fgFoilHue, hasFg && v.fgFoil !== "none");
       paint(n.backFoil, v.foil === "gloss" ? "rainbow" : v.foil, 100, 100, v.foilHue, true);
+      // Quicksand needs a foreground to sit behind.
+      const sandOn = hasFg && v.sand;
+      this.el.classList.toggle("hc--sand", sandOn);
+      n.sandCanvas.hidden = !sandOn;
+      if (sandOn) {
+        if (!this.sand) this.sand = new Sand(n.sandCanvas);
+        this.sand.setColor(v.sandColor);
+        if (!this._unRaw && this.opts.gyro) {
+          this._unRaw = HC.gyro.subscribeRaw((tx, ty) => {
+            this._tiltDeg = [tx, ty];
+            this._wakeSand();
+          });
+        }
+      }
+      this._sandOn = sandOn;
+      this._wakeSand();
+
       const mask = hasFg ? `url("${String(d.fg).replace(/"/g, "%22")}")` : "none";
       n.fgFoil.forEach((e) => {
         if (e._mask !== mask) {
@@ -291,7 +487,7 @@
       this.el.setAttribute("role", "img");
       this.el.setAttribute(
         "aria-label",
-        [d.title || "未命名卡片", d.subtitle, HC.foilName(d.foil) + "鐳射"].filter(Boolean).join("，")
+        [d.title || T("未命名卡片"), d.subtitle, T("{foil}鐳射", { foil: HC.foilName(d.foil) })].filter(Boolean).join(T("，"))
       );
     }
 
@@ -346,6 +542,7 @@
           entries.forEach((en) => {
             this._visible = en.isIntersecting;
             if (!en.isIntersecting) this._rest();
+            else this._wakeSand();
           });
         });
         this._io.observe(this.el);
@@ -388,8 +585,10 @@
       const fast = { stiffness: 0.066, damping: 0.25 };
       s.ry.set(x * max * strength, fast);
       s.rx.set(-y * max * strength, fast);
-      s.mx.set(50 + x * 50, fast);
-      s.my.set(50 + y * 50, fast);
+      // Light position is in the card's own coordinates: mirrored when the card is upside down.
+      const r = this.turned ? -1 : 1;
+      s.mx.set(50 + r * x * 50, fast);
+      s.my.set(50 + r * y * 50, fast);
       s.o.set(0.55 + 0.45 * Math.min(1, Math.hypot(x, y)));
       HC.ticker.add(this._tick);
     }
@@ -414,7 +613,57 @@
       this.el.dispatchEvent(new CustomEvent("hc:flip", { detail: this.flipped }));
     }
 
+    /** Turn the card upside down (and back). Quicksand pours to the new bottom. */
+    turn(to) {
+      this.turned = typeof to === "boolean" ? to : !this.turned;
+      this.s.rot.set(this.turned ? 180 : 0);
+      this.el.classList.toggle("hc--turned", this.turned);
+      HC.ticker.add(this._tick);
+      this._wakeSand();
+      this.el.dispatchEvent(new CustomEvent("hc:turn", { detail: this.turned }));
+    }
+
     /* ---------------------------------------------------------------- */
+    /* Quicksand loop                                                    */
+    /* ---------------------------------------------------------------- */
+    _wakeSand() {
+      if (this._sandOn && !this._dead) {
+        this._sandWait = 0;
+        HC.ticker.add(this._sandTick);
+      }
+    }
+
+    _gravity() {
+      // Gravity on screen: from the phone's tilt, or straight down.
+      let gx = 0, gy = 1;
+      if (this._tiltDeg && HC.gyro.receiving && this.opts.gyro) {
+        gx = Math.sin((this._tiltDeg[0] * Math.PI) / 180);
+        gy = Math.sin((this._tiltDeg[1] * Math.PI) / 180);
+      }
+      // Into the card's own coordinates (the card may be turned upside down).
+      const a = (-this.s.rot.value * Math.PI) / 180;
+      return [gx * Math.cos(a) - gy * Math.sin(a), gx * Math.sin(a) + gy * Math.cos(a)];
+    }
+
+    _sandTick(steps) {
+      if (this._dead || !this._sandOn || !this.sand) return false;
+      if (this._visible === false) return false;
+      const art = this.n.art;
+      const w = art.offsetWidth, h = art.offsetHeight;
+      if (!w || !h) {
+        // Not laid out yet; try again for a moment.
+        return ++this._sandWait < 120;
+      }
+      const cols = 96;
+      this.sand.resize(cols, Math.max(8, Math.round((cols * h) / w)));
+      const [gx, gy] = this._gravity();
+      this.sand.setGravity(gx, gy);
+      for (let i = 0; i < Math.min(steps, 2); i++) this.sand.step();
+      this.sand.draw();
+      // Frames with no simulation step (fast screens) must not end the loop.
+      return !this.sand.asleep || !this.s.rot.settled;
+    }
+
     _idleTargets(now) {
       if (!this.opts.idle || HC.reducedMotion) return false;
       if (this.pointerActive || (HC.gyro.receiving && this.opts.gyro)) return false;
@@ -465,11 +714,14 @@
       st.setProperty("--o", clamp(s.o.value, 0, 1).toFixed(3));
       st.setProperty("--lift", s.lift.value.toFixed(4));
       st.setProperty("--flip", s.flip.value.toFixed(2) + "deg");
+      st.setProperty("--rot", s.rot.value.toFixed(2) + "deg");
     }
 
     destroy() {
       this._dead = true;
       HC.ticker.remove(this._tick);
+      HC.ticker.remove(this._sandTick);
+      if (this._unRaw) this._unRaw();
       if (this._unGyro) this._unGyro();
       if (this._io) this._io.disconnect();
       if (this._unbindPointer) this._unbindPointer();

@@ -52,7 +52,7 @@
 .hc__tilt {
   position: absolute;
   inset: 0;
-  transform: perspective(380cqw) rotateX(var(--rx)) rotateY(var(--ry)) scale(var(--lift));
+  transform: perspective(380cqw) rotateX(var(--rx)) rotateY(var(--ry)) scale(var(--lift)) rotate(var(--rot, 0deg));
   transform-style: preserve-3d;
   will-change: transform;
 }
@@ -138,7 +138,18 @@
   -webkit-mask-repeat: no-repeat;
           mask-repeat: no-repeat;
 }
-.hc__bg[hidden], .hc__fg[hidden], .hc__foil[hidden] { display: none; }
+.hc__bg[hidden], .hc__fg[hidden], .hc__foil[hidden], .hc__sand[hidden] { display: none; }
+
+/* Quicksand: between the photo and the foreground, drifting a little with the tilt. */
+.hc__sand {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform: translate(calc(var(--dx) * .8cqw), calc(var(--dy) * .8cqw));
+  filter: drop-shadow(0 -.3cqw .6cqw rgba(0, 0, 0, .18));
+}
 
 /* ------------------------------------------------------------------ */
 /* Text                                                                */

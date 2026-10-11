@@ -28,6 +28,15 @@
     "targets": ["nsis"],
     "publisher": "Axiang1211",
     "shortDescription": "把照片做成會反光的 3D 卡片",
+    "fileAssociations": [
+      {
+        "ext": ["3dcard"],
+        "name": "3D Card",
+        "description": "3D Cards 卡片",
+        "role": "Viewer",
+        "mimeType": "application/x-3dcard"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

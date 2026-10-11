@@ -1,0 +1,330 @@
+/*
+ * i18n.js
+ * Interface language: 中文 (default) or English.
+ * Every interface string is written in Chinese in the code and passed through HC.t();
+ * the English text is looked up here. Anything missing simply stays in Chinese.
+ * The choice is remembered; switching reloads the page.
+ */
+(function () {
+  "use strict";
+  const HC = (window.HC = window.HC || {});
+  const KEY = "hc:lang";
+
+  let lang = null;
+  try {
+    lang = localStorage.getItem(KEY);
+  } catch (e) {}
+  if (lang !== "zh" && lang !== "en") {
+    const nav = (navigator.languages && navigator.languages[0]) || navigator.language || "zh";
+    lang = /^zh/i.test(nav) ? "zh" : "en";
+  }
+  HC.lang = lang;
+  document.documentElement.lang = lang === "en" ? "en" : "zh-Hant-TW";
+
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const EN = {
+  "無邊框": "No frame",
+  "{c}框": "{c} frame",
+  "亮面，{frame}": "Gloss, {frame}",
+  "整張": "whole card",
+  "{foil}鐳射在{where}，{frame}": "{foil} foil on {where}, {frame}",
+  "，前景{foil}鐳射": ", {foil} foil on foreground",
+  "，流沙": ", quicksand",
+  "重新校正水平": "Reset level",
+  "用手機轉動卡片": "Tilt with your phone",
+  "以手機目前的角度作為卡片的水平位置": "Use the phone's current angle as level",
+  "已重新校正": "Level reset",
+  "無法使用陀螺儀。請在瀏覽器設定中允許「動作與方向」存取。": "Can't use the gyroscope. Allow Motion & Orientation access in your browser settings.",
+  "電腦版": "Desktop app",
+  "檢查更新": "Check for updates",
+  "電腦版 {v}": "Desktop app {v}",
+  "未命名卡片": "Untitled card",
+  "把照片做成": "Turn photos into",
+  "會反光的卡片": "shimmering cards",
+  "上傳一張照片，選一種鐳射。卡片會跟著滑鼠傾斜、跟著手機轉動，光澤會一路流過畫面。": "Upload a photo and pick a holographic foil. The card tilts with your mouse and turns with your phone, and the shine sweeps across it.",
+  "上傳照片製作": "Upload a photo",
+  "看看展廳": "Browse the gallery",
+  "照片只在你的瀏覽器裡處理。只有在你按下「分享」時，那張卡片才會上傳。": "Photos are processed in your browser. A card is only uploaded when you press Share.",
+  "下載 Windows 電腦版": "Download for Windows",
+  "安裝後不用開瀏覽器也能做卡片": "Make cards without opening a browser",
+  "查看「{title}」": "View “{title}”",
+  "把滑鼠移到卡片上": "Move your mouse over the card",
+  "轉動手機看看光澤": "Tilt your phone to see the shine",
+  "全部": "All",
+  "示範作品": "Examples",
+  "我的卡片": "My cards",
+  "篩選卡片": "Filter cards",
+  "已匯入「{title}」": "Imported “{title}”",
+  "匯入失敗。": "Import failed.",
+  "展廳": "Gallery",
+  "用連結加入": "Add from link",
+  "匯入卡片檔": "Import card file",
+  "你還沒有自己的卡片。上傳一張照片，一分鐘內就能做好。": "You have no cards yet. Upload a photo and you'll have one in a minute.",
+  "這個瀏覽器不允許儲存資料，做好的卡片在關閉分頁後會消失。": "This browser doesn't allow saving data. Your cards will disappear when you close the tab.",
+  "我的": "Mine",
+  "找不到這張卡片": "Card not found",
+  "自己做的卡片只存在建立它的瀏覽器裡。若你換了瀏覽器、清除了網站資料，或連結裡的編號打錯了，就會看到這個畫面。": "Cards you make are stored only in the browser you made them in. You'll see this if you switched browsers, cleared site data, or the link has a typo.",
+  "回到展廳": "Back to gallery",
+  "找不到卡片": "Card not found",
+  "切換卡片": "Switch card",
+  "上一張：{title}": "Previous: {title}",
+  "未命名": "Untitled",
+  "下一張：{title}": "Next: {title}",
+  "鐳射樣式": "Foil style",
+  "只是試看，不會改動卡片。": "Just a preview. The card is not changed.",
+  "上下顛倒": "Turn upside down",
+  "翻到背面": "Show back",
+  "翻回正面": "Show front",
+  "下載卡片檔": "Download card file",
+  "已下載卡片檔。在任何一台裝置上按「匯入卡片檔」就能打開。": "Card file downloaded. Open it on any device with “Import card file”.",
+  "無法下載這張卡片。若你是直接開啟本機檔案，請改用本機伺服器瀏覽。": "Couldn't download this card. If you opened the site as a local file, use a local web server instead.",
+  "分享": "Share",
+  "分享中・查看連結": "Shared · view link",
+  "連結會在 {date}失效。": "The link expires on {date}.",
+  "刪除": "Delete",
+  "再按一次刪除": "Press again to delete",
+  "已刪除「{title}」": "Deleted “{title}”",
+  "編輯": "Edit",
+  "從分享連結加入的卡片，已經存在你這裡，連結過期也看得到。": "Added from a share link. It's saved here, so you'll still have it after the link expires.",
+  "你做的卡片，存在這台電腦的 3D Cards 裡。": "Your card, saved in 3D Cards on this computer.",
+  "你做的卡片，只存在這個瀏覽器裡。": "Your card, saved only in this browser.",
+  "移動滑鼠或拖曳來傾斜卡片，點一下翻面。方向鍵也能傾斜。": "Move the mouse or drag to tilt the card. Click to flip it. Arrow keys tilt too.",
+  "用手指拖曳或轉動手機來傾斜卡片，點一下翻面。": "Drag with your finger or tilt your phone. Tap to flip.",
+  "找不到要編輯的卡片": "Card to edit not found",
+  "只有在這個瀏覽器裡做的卡片才能編輯。": "Only cards made in this browser can be edited.",
+  "做一張新卡片": "Make a new card",
+  "拖一張照片到這裡": "Drop a photo here",
+  "或使用右側的「選擇照片」": "or use “Choose photo” on the right",
+  "更換照片": "Change photo",
+  "選擇照片": "Choose photo",
+  "已載入照片": "Photo loaded",
+  "JPG、PNG、WebP 或 HEIC，最大 30 MB": "JPG, PNG, WebP or HEIC, up to 30 MB",
+  "縮放": "Zoom",
+  "水平位置": "Horizontal position",
+  "垂直位置": "Vertical position",
+  "背景模糊": "Background blur",
+  "不模糊": "None",
+  "加入前景圖層後才能模糊背景，讓前景更突出。": "Add a foreground layer to blur the background and make the foreground stand out.",
+  "樣式": "Style",
+  "範圍": "Area",
+  "強度": "Strength",
+  "紋理大小": "Pattern size",
+  "色調": "Hue",
+  "移除前景": "Remove foreground",
+  "從照片自動摳圖": "Cut out from photo",
+  "請先選擇一張照片。": "Choose a photo first.",
+  "第一次使用要下載摳圖工具（約 8 MB）… {p}%": "Downloading the cut-out tool for the first time (about 8 MB)… {p}%",
+  "正在找出照片裡的主體…": "Finding the subject in your photo…",
+  "摳好了。效果不理想的話，可以自己用其他工具去背後按「加入前景圖」上傳。": "Done. If it isn't clean enough, cut it out with another tool and upload it with “Add foreground”.",
+  "摳圖失敗，請換一張照片試試。": "Cut-out failed. Try another photo.",
+  "前景鐳射": "Foreground foil",
+  "前景鐳射強度": "Foreground foil strength",
+  "前景鐳射色調": "Foreground foil hue",
+  "金": "Gold",
+  "粉": "Pink",
+  "藍": "Blue",
+  "紫": "Purple",
+  "銀白": "Silver",
+  "自訂流沙顏色": "Custom quicksand colour",
+  "流沙顏色": "Quicksand colour",
+  "前景大小": "Foreground size",
+  "前景左右": "Foreground left / right",
+  "前景上下": "Foreground up / down",
+  "流沙：在照片和前景之間流動，佔畫面的一半": "Quicksand: flows between the photo and the foreground, fills half the picture",
+  "重設前景": "Reset foreground",
+  "更換前景圖": "Change foreground",
+  "加入前景圖": "Add foreground",
+  "標題": "Title",
+  "例如：夏天的海": "e.g. Summer sea",
+  "副標": "Subtitle",
+  "地點、日期或一句話": "A place, a date or a line",
+  "編號": "Number",
+  "例如：001/100": "e.g. 001/100",
+  "顏色": "Colour",
+  "儲存變更": "Save changes",
+  "儲存到展廳": "Save to gallery",
+  "編輯卡片": "Edit card",
+  "製作卡片": "Make a card",
+  "照片在你的瀏覽器裡處理和儲存。只有按下「分享」的卡片才會上傳。": "Photos are processed and saved in your browser. Only cards you share are uploaded.",
+  "照片": "Photo",
+  "背景照片": "Background photo",
+  "重設背景": "Reset background",
+  "背景鐳射": "Background foil",
+  "重設鐳射數值": "Reset foil values",
+  "前景圖層": "Foreground layer",
+  "選用": "Optional",
+  "一張去背的 PNG（例如照片裡的人物），會浮在照片上方，傾斜時前後景分開移動，產生立體感。前景可以有自己的鐳射和位置。": "A cut-out PNG (such as the person in your photo) that floats above the photo. Foreground and background move apart when the card tilts, giving it depth. The foreground can have its own foil and position.",
+  "「自動摳圖」會用電腦在你的裝置上找出照片裡的主體，照片不會上傳。主體清楚、背景單純的照片效果最好，不保證每張都摳得乾淨。": "“Cut out from photo” finds the subject on your device; the photo is not uploaded. It works best with one clear subject on a simple background, and won't be perfect every time.",
+  "文字": "Text",
+  "在卡片上顯示文字": "Show text on the card",
+  "邊框": "Frame",
+  "取消": "Cancel",
+  "已儲存變更": "Changes saved",
+  "已儲存到展廳": "Saved to gallery",
+  "儲存失敗：瀏覽器的儲存空間可能已滿。請刪除幾張舊卡片再試。": "Couldn't save: browser storage may be full. Delete a few old cards and try again.",
+  "把滑鼠移到預覽上看看效果": "Move your mouse over the preview",
+  "拖曳預覽看看效果": "Drag the preview to see the effect",
+  "看不到這張卡片": "This card isn't available",
+  "這張分享的卡片不存在，可能已被刪除。": "This shared card doesn't exist. It may have been deleted.",
+  "去展廳看看": "Visit the gallery",
+  "自己做一張": "Make your own",
+  "存到我的卡片": "Save to my cards",
+  "這張卡片之前已經存過了": "You've already saved this card",
+  "已存到「我的卡片」": "Saved to My cards",
+  "儲存失敗：儲存空間可能已滿。": "Couldn't save: storage may be full.",
+  "有人分享了一張卡片給你": "Someone shared a card with you",
+  "這個分享連結會在 {date}失效。喜歡的話可以存到你的卡片。": "This link expires on {date}. Save the card to keep it.",
+  "移動滑鼠或拖曳來傾斜卡片，點一下翻面。": "Move the mouse or drag to tilt the card. Click to flip it.",
+  "分享的卡片": "Shared card",
+  "沒有設定網站網址（config.js 的 siteUrl），無法分享。": "Sharing needs the site address (siteUrl in config.js).",
+  "連不上分享伺服器。請確認網路連線後再試一次。": "Can't reach the sharing server. Check your connection and try again.",
+  "這個網站沒有開啟分享功能。": "Sharing isn't enabled on this site.",
+  "分享失敗（錯誤 {code}）。請稍後再試。": "Sharing failed (error {code}). Please try again later.",
+  "{m}月{d}日（還有 {n} 天）": "{d} {mon} ({n} days left)",
+  "分享卡片": "Share card",
+  "關閉": "Close",
+  "分享連結": "Share link",
+  "複製連結": "Copy link",
+  "已複製": "Copied",
+  "無法自動複製，請手動選取連結。": "Couldn't copy automatically. Select the link and copy it.",
+  "用其他 App 分享": "Share with another app",
+  "開啟連結": "Open link",
+  "停止分享": "Stop sharing",
+  "再按一次，連結會失效": "Press again to turn the link off",
+  "已停止分享，連結失效了": "Sharing stopped. The link no longer works.",
+  "任何人打開這個連結，都能看到並轉動這張卡片。": "Anyone with this link can see and tilt this card. ",
+  "這張卡片已經分享過了。任何人打開連結都能看到它。": "This card is already shared. Anyone with the link can see it. ",
+  "建立分享連結": "Create share link",
+  "建立連結時，卡片和照片會上傳到網站的伺服器，任何拿到連結的人都能看到。連結會保留 14 天，之後自動失效；你也可以隨時停止分享。": "Creating a link uploads the card and its photos to the site's server, and anyone with the link can see it. Links last 14 days, then stop working. You can stop sharing at any time.",
+  "上次的分享連結已經過期了，可以建立一個新的。": "Your previous link has expired. You can create a new one.",
+  "你在上次分享後編輯過這張卡片。建立新連結後，舊連結會失效。": "You edited this card after sharing it. Creating a new link turns the old one off.",
+  "上傳中…": "Uploading…",
+  "分享失敗，請稍後再試。": "Sharing failed. Please try again later.",
+  "連結建立好了。任何人打開它都能看到並轉動這張卡片。": "Your link is ready. Anyone who opens it can see and tilt this card. ",
+  "再試一次": "Try again",
+  "貼上分享連結，例如 https://…/s/AbCd1234": "Paste a share link, e.g. https://…/s/AbCd1234",
+  "加入我的卡片": "Add to my cards",
+  "把別人傳給你的分享連結貼在這裡，卡片和照片會存進你的卡片，之後沒有網路、或連結過期了也看得到。": "Paste a share link someone sent you. The card and its photos are saved to your cards, so you can see them offline or after the link expires.",
+  "這看起來不是分享連結。分享連結的結尾會是 /s/ 加上一串英文和數字。": "That doesn't look like a share link. Share links end in /s/ followed by letters and numbers.",
+  "加入中…": "Adding…",
+  "這張卡片之前已經加入過了": "You've already added this card",
+  "已加入「{title}」": "Added “{title}”",
+  "加入失敗，請稍後再試。": "Couldn't add the card. Please try again later.",
+  "用連結加入卡片": "Add a card from a link",
+  "這不是圖片檔。請選擇 JPG、PNG 或 WebP。": "That isn't an image. Choose a JPG, PNG or WebP.",
+  "圖片超過 30 MB。請先縮小再上傳。": "The image is over 30 MB. Make it smaller and try again.",
+  "瀏覽器讀不出這張圖片。請換成 JPG 或 PNG 再試一次。": "The browser can't read this image. Try a JPG or PNG.",
+  "圖片處理失敗。請換一張圖片再試一次。": "Couldn't process the image. Try another one.",
+  "卡片裡的圖片格式不正確。": "The card's images are in the wrong format.",
+  "這個檔案不是卡片檔。卡片檔的副檔名是 .3dcard。": "This isn't a card file. Card files end in .3dcard.",
+  "彩虹": "Rainbow",
+  "星塵": "Stardust",
+  "稜鏡": "Prism",
+  "流光": "Metal",
+  "亮面": "Gloss",
+  "只有照片": "photo only",
+  "只有邊框": "frame only",
+  "白": "White",
+  "黑": "Black",
+  "銀": "Silver",
+  "無": "None",
+  "{foil}鐳射": "{foil} foil",
+  "，": ", ",
+  "下載新版": "Download new version",
+  "稍後再說": "Later",
+  "更新後才能使用新功能。不更新也可以繼續使用目前的版本。": "Update to get the new features. You can keep using this version if you don't.",
+  "這個版本不再提醒": "Don't remind me about this version",
+  "新版安裝檔正在你的瀏覽器裡下載。": "The new installer is downloading in your browser.",
+  "下載完成後，先關閉 3D Cards，再執行 3D-Cards-Setup.exe，就會更新成新版本。你做過的卡片都會保留。": "When it's done, close 3D Cards and run 3D-Cards-Setup.exe to update. Your cards are kept.",
+  "知道了": "OK",
+  "有新版本": "New version available",
+  "3D Cards {latest} 已經推出，你目前使用的是 {current}。": "3D Cards {latest} is out. You're using {current}.",
+  "你使用的 {current} 已經是最新版本。": "{current} is the latest version.",
+  "現在無法連上 GitHub 檢查更新，請確認網路後再試。": "Can't reach GitHub to check for updates. Check your connection and try again.",
+  "無法下載摳圖工具。請確認網路連線後再試一次。": "Couldn't download the cut-out tool. Check your connection and try again.",
+  "伺服器發生錯誤，請稍後再試。": "Server error. Please try again later.",
+  "找不到這個網址。": "Not found.",
+  "不支援這個操作。": "That action isn't supported.",
+  "卡片太大了，請換小一點的照片。": "The card is too large. Try a smaller photo.",
+  "資料格式不正確。": "The data is in the wrong format.",
+  "缺少照片，或照片格式不是 JPG、PNG、WebP。": "The photo is missing or isn't a JPG, PNG or WebP.",
+  "前景圖的格式不正確。": "The foreground image is in the wrong format.",
+  "伺服器忙碌中，請稍後再試。": "The server is busy. Please try again later.",
+  "這張分享的卡片已經失效。分享連結只保留 14 天，或分享的人已經停止分享。": "This shared card is no longer available. Share links last 14 days, or the owner stopped sharing.",
+  "缺少刪除權杖。": "Missing delete token.",
+  "沒有權限刪除這張卡片。": "You don't have permission to delete this card.",
+  "跳到主要內容": "Skip to content",
+  "開源專案，以 MIT 授權釋出。照片只在你的瀏覽器裡處理，按下「分享」的卡片才會上傳。": "Open source under the MIT licence. Photos are processed in your browser; only cards you share are uploaded.",
+  "在 GitHub 查看原始碼": "View source on GitHub",
+  "這個網站需要 JavaScript 才能顯示卡片。": "This site needs JavaScript to show the cards.",
+  "語言": "Language",
+  "主要": "Main",
+  "關閉全螢幕": "Close full screen",
+  "拖曳旋轉 · 雙擊翻面 · 滾輪縮放": "Drag to rotate · double-click to flip · scroll to zoom",
+  "拖曳旋轉 · 點兩下翻面 · 雙指縮放": "Drag to rotate · double-tap to flip · pinch to zoom",
+  "全螢幕": "Full screen",
+  "翻面": "Flip",
+  "顛倒": "Upside down",
+  "收藏": "Save",
+  "雲端同步": "Cloud sync",
+  "用 Google 同步": "Sync with Google",
+  "無法連上 Google，請確認網路連線後再試。": "Can't reach Google. Check your connection and try again.",
+  "Google 登入沒有完成。": "Google sign-in wasn't completed.",
+  "連不上伺服器，請確認網路連線後再試。": "Can't reach the server. Check your connection and try again.",
+  "代碼已經過期，請重新登入。": "The code has expired. Please sign in again.",
+  "Google 雲端硬碟回應錯誤（{code}）。": "Google Drive returned an error ({code}).",
+  "正在讀取雲端的卡片…": "Reading your cards in the cloud…",
+  "正在上傳「{title}」…": "Uploading “{title}”…",
+  "正在下載卡片…": "Downloading cards…",
+  "同步完成：上傳 {up} 張、下載 {down} 張。": "Sync complete: {up} uploaded, {down} downloaded.",
+  "登入已過期，請重新登入。": "Your sign-in has expired. Please sign in again.",
+  "同步失敗，請稍後再試。": "Sync failed. Please try again later.",
+  "在瀏覽器打開下面的網址，登入 Google 後輸入這組代碼：": "Open the address below in your browser, sign in to Google and enter this code:",
+  "打開 Google 登入頁": "Open Google sign-in",
+  "輸入代碼後，這裡會自動完成登入…": "After you enter the code, sign-in finishes here automatically…",
+  "用 Google 登入": "Sign in with Google",
+  "登入 Google 後，你的卡片會存到你自己的 Google 雲端硬碟（一個只有 3D Cards 看得到的隱藏資料夾），換電腦或手機登入同一個帳號就能取回。": "Sign in with Google to keep your cards in your own Google Drive, in a hidden folder only 3D Cards can see. Sign in with the same account on another computer or phone to get them back.",
+  "已登入：{email}": "Signed in: {email}",
+  "上次同步：{time}": "Last synced: {time}",
+  "立即同步": "Sync now",
+  "登出": "Sign out",
+  "電腦版的 Google 登入還沒設定好。": "Google sign-in for the desktop app isn't set up yet."
+};
+
+  /** HC.t("已加入「{title}」", { title }) */
+  HC.t = function (zh, params) {
+    let s = lang === "en" && Object.prototype.hasOwnProperty.call(EN, zh) ? EN[zh] : zh;
+    if (params) {
+      if (lang === "en" && params.m != null && s.indexOf("{mon}") >= 0) params = Object.assign({ mon: MONTHS[params.m - 1] }, params);
+      s = s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? params[k] : m));
+    }
+    return s;
+  };
+
+  HC.setLang = function (next) {
+    if (next === lang) return;
+    try {
+      localStorage.setItem(KEY, next);
+    } catch (e) {}
+    location.reload();
+  };
+
+  /* Static text in index.html: elements with data-i18n (text) or data-i18n-attr="attr". */
+  function translatePage() {
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      el.textContent = HC.t(el.getAttribute("data-i18n") || el.textContent.trim());
+    });
+    document.querySelectorAll("[data-i18n-label]").forEach((el) => {
+      el.setAttribute("aria-label", HC.t(el.getAttribute("data-i18n-label")));
+    });
+    const sw = document.getElementById("lang-switch");
+    if (sw) {
+      sw.querySelectorAll("button").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b.dataset.lang === lang));
+        b.addEventListener("click", () => HC.setLang(b.dataset.lang));
+      });
+    }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", translatePage);
+  else translatePage();
+})();

@@ -48,6 +48,10 @@
   HC.toast = function (msg, kind) {
     const t = document.getElementById("toast");
     if (!t) return;
+    // An open <dialog> sits above everything else, so the toast moves into it.
+    const dlg = document.querySelector("dialog[open]");
+    const host = dlg || document.body;
+    if (t.parentNode !== host) host.appendChild(t);
     t.textContent = msg;
     t.dataset.kind = kind || "info";
     t.classList.add("is-on");
@@ -58,14 +62,15 @@
   HC.describe = function (card) {
     const frame = (HC.FRAMES.find((f) => f.id === card.frame) || {}).name || "";
     const area = (HC.AREAS.find((a) => a.id === card.area) || {}).name || "";
-    const frameText = frame === "無邊框" ? "無邊框" : frame + "框";
+    const frameText = card.frame === "none" ? HC.t("無邊框") : HC.t("{c}框", { c: frame });
     let text;
-    if (card.foil === "gloss") text = "亮面，" + frameText;
+    if (card.foil === "gloss") text = HC.t("亮面，{frame}", { frame: frameText });
     else {
-      const where = card.frame === "none" && card.area === "frame" ? "整張" : area;
-      text = `${HC.foilName(card.foil)}鐳射在${where}，${frameText}`;
+      const where = card.frame === "none" && card.area === "frame" ? HC.t("整張") : area;
+      text = HC.t("{foil}鐳射在{where}，{frame}", { foil: HC.foilName(card.foil), where, frame: frameText });
     }
-    if (card.fg && card.fgFoil && card.fgFoil !== "none") text += `，前景${HC.foilName(card.fgFoil)}鐳射`;
+    if (card.fg && card.fgFoil && card.fgFoil !== "none") text += HC.t("，前景{foil}鐳射", { foil: HC.foilName(card.fgFoil) });
+    if (card.fg && card.sand) text += HC.t("，流沙");
     return text;
   };
 
@@ -73,7 +78,9 @@
   /* ------------------------------------------------------------------ */
   /* Card repository: gallery cards + the visitor's own cards            */
   /* ------------------------------------------------------------------ */
-  const gallery = (window.HC_GALLERY || []).map((c) => Object.assign({}, HC.DEFAULTS, c, { own: false }));
+  const gallery = (window.HC_GALLERY || []).map((c) =>
+    Object.assign({}, HC.DEFAULTS, c, HC.lang === "en" && c.en ? c.en : {}, { own: false })
+  );
 
   HC.cards = {
     gallery,
@@ -107,21 +114,21 @@
     const sync = () => {
       let label = null;
       if (!g.available || g.failed) label = null;
-      else if (g.enabled && g.receiving) label = "重新校正水平";
-      else if (!g.enabled) label = "用手機轉動卡片";
+      else if (g.enabled && g.receiving) label = HC.t("重新校正水平");
+      else if (!g.enabled) label = HC.t("用手機轉動卡片");
       btn.hidden = !label;
       if (label) btn.textContent = label;
-      if (g.receiving) btn.setAttribute("aria-label", "以手機目前的角度作為卡片的水平位置");
+      if (g.receiving) btn.setAttribute("aria-label", HC.t("以手機目前的角度作為卡片的水平位置"));
       else btn.removeAttribute("aria-label");
     };
     btn.addEventListener("click", async () => {
       if (g.enabled && g.receiving) {
         g.recenter();
-        HC.toast("已重新校正");
+        HC.toast(HC.t("已重新校正"));
         return;
       }
       const ok = await g.enable();
-      if (!ok) HC.toast("無法使用陀螺儀。請在瀏覽器設定中允許「動作與方向」存取。", "error");
+      if (!ok) HC.toast(HC.t("無法使用陀螺儀。請在瀏覽器設定中允許「動作與方向」存取。"), "error");
       sync();
     });
     const off = g.onState(sync);
@@ -204,10 +211,10 @@
     const D = window.HC_DESKTOP;
     const links = document.querySelector(".site-foot__links");
     if (D && typeof D.version === "function" && links) {
-      const ver = HC.h("span.site-foot__ver", "電腦版");
-      const upd = HC.h("button.site-foot__link.site-foot__btn", { type: "button", onclick: () => D.checkForUpdates() }, "檢查更新");
+      const ver = HC.h("span.site-foot__ver", HC.t("電腦版"));
+      const upd = HC.h("button.site-foot__link.site-foot__btn", { type: "button", onclick: () => D.checkForUpdates() }, HC.t("檢查更新"));
       links.prepend(ver, upd);
-      D.version().then((v) => (ver.textContent = "電腦版 " + v)).catch(() => {});
+      D.version().then((v) => (ver.textContent = HC.t("電腦版 {v}", { v }))).catch(() => {});
     }
     const dl = document.getElementById("download-link");
     if (dl && CONFIG.downloadUrl && !window.HC_DESKTOP) {
@@ -220,6 +227,10 @@
       else repo.hidden = true;
     }
     HC.gyro.autoStart();
+    // Ask the browser / app to keep saved cards even when disk space runs low.
+    try {
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    } catch (e) {}
     window.addEventListener("hashchange", navigate);
     render();
   }

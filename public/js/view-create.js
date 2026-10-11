@@ -66,12 +66,12 @@
         root.appendChild(
           h(
             "section.maker-missing",
-            h("h1", "找不到要編輯的卡片"),
-            h("p", "只有在這個瀏覽器裡做的卡片才能編輯。"),
-            h("a.btn.btn--ink", { href: "#/create" }, "做一張新卡片")
+            h("h1", HC.t("找不到要編輯的卡片")),
+            h("p", HC.t("只有在這個瀏覽器裡做的卡片才能編輯。")),
+            h("a.btn.btn--ink", { href: "#/create" }, HC.t("做一張新卡片"))
           )
         );
-        return { title: "找不到卡片" };
+        return { title: HC.t("找不到卡片") };
       }
     }
 
@@ -97,8 +97,9 @@
 
     /* Preview ----------------------------------------------------------- */
     const card = new HC.HoloCard(previewData(), { dragTilt: true, maxTilt: 16, restFoil: 0.4 });
-    const empty = h("div.maker__empty", h("strong", "拖一張照片到這裡"), h("span", "或使用右側的「選擇照片」"));
+    const empty = h("div.maker__empty", h("strong", HC.t("拖一張照片到這裡")), h("span", HC.t("或使用右側的「選擇照片」")));
     const stage = h("div.maker__stage", h("div.maker__card", card.el, empty));
+    var turnBtn = h("button.btn.btn--line.btn--sm.turn-btn", { type: "button", hidden: true, onclick: () => card.turn() }, HC.t("上下顛倒"));
     const refresh = () => {
       card.setData(previewData());
       empty.hidden = !!draft.imageBlob;
@@ -110,9 +111,10 @@
     const photoName = h("span.drop__name");
     const photoBtn = h("label.drop", photoInput, h("span.drop__cta"), photoName);
     const syncPhoto = () => {
-      photoBtn.querySelector(".drop__cta").textContent = draft.imageBlob ? "更換照片" : "選擇照片";
-      photoName.textContent = draft.imageBlob ? "已載入照片" : "JPG、PNG、WebP 或 HEIC，最大 30 MB";
+      photoBtn.querySelector(".drop__cta").textContent = draft.imageBlob ? HC.t("更換照片") : HC.t("選擇照片");
+      photoName.textContent = draft.imageBlob ? HC.t("已載入照片") : HC.t("JPG、PNG、WebP 或 HEIC，最大 30 MB");
       photoBtn.classList.toggle("has-file", !!draft.imageBlob);
+      if (typeof autoBtn !== "undefined") autoBtn.disabled = !draft.imageBlob;
     };
     async function takePhoto(file) {
       if (!file) return;
@@ -190,39 +192,69 @@
 
     /* Background photo ------------------------------------------------- */
     const bgFields = [
-      slider("zoom", "縮放", { min: 1, max: 3, step: 0.01, format: times }),
-      slider("posX", "水平位置", { min: 0, max: 100, step: 1, format: pct }),
-      slider("posY", "垂直位置", { min: 0, max: 100, step: 1, format: pct }),
+      slider("zoom", HC.t("縮放"), { min: 1, max: 3, step: 0.01, format: times }),
+      slider("posX", HC.t("水平位置"), { min: 0, max: 100, step: 1, format: pct }),
+      slider("posY", HC.t("垂直位置"), { min: 0, max: 100, step: 1, format: pct }),
     ];
-    const blurF = slider("bgBlur", "背景模糊", { min: 0, max: 100, step: 1, format: (v) => (v ? Math.round(v) : "不模糊") });
-    const blurNote = h("p.group__help", "加入前景圖層後才能模糊背景，讓前景更突出。");
+    const blurF = slider("bgBlur", HC.t("背景模糊"), { min: 0, max: 100, step: 1, format: (v) => (v ? Math.round(v) : HC.t("不模糊")) });
+    const blurNote = h("p.group__help", HC.t("加入前景圖層後才能模糊背景，讓前景更突出。"));
 
     /* Background foil -------------------------------------------------- */
-    const foilF = segGroup("foil", "樣式", HC.FOILS, draft.foil, (v) => {
+    const foilF = segGroup("foil", HC.t("樣式"), HC.FOILS, draft.foil, (v) => {
       draft.foil = v;
       syncFoilFields();
       refresh();
     }, (o) => h("span.foil-pick__swatch", { "aria-hidden": "true", dataset: { foil: o.id } }));
     foilF.classList.add("field--foil");
     segs.foil = foilF;
-    const areaF = segGroup("area", "範圍", HC.AREAS, draft.area, (v) => {
+    const areaF = segGroup("area", HC.t("範圍"), HC.AREAS, draft.area, (v) => {
       draft.area = v;
       refresh();
     });
     segs.area = areaF;
     const foilTune = h(
       "div.tune",
-      slider("foilStrength", "強度", { min: 0, max: 200, step: 1, format: pct }),
-      slider("foilScale", "紋理大小", { min: 50, max: 200, step: 1, format: pct }),
-      slider("foilHue", "色調", { min: 0, max: 360, step: 1, format: deg })
+      slider("foilStrength", HC.t("強度"), { min: 0, max: 200, step: 1, format: pct }),
+      slider("foilScale", HC.t("紋理大小"), { min: 50, max: 200, step: 1, format: pct }),
+      slider("foilHue", HC.t("色調"), { min: 0, max: 360, step: 1, format: deg })
     );
 
     /* Foreground ------------------------------------------------------- */
     const fgInput = h("input.sr-only", { type: "file", accept: "image/png,image/webp", id: "fg-input" });
     const fgText = h("span");
     const fgLabel = h("label.btn.btn--line.btn--sm.file-btn", fgInput, fgText);
-    const fgRemove = h("button.btn.btn--quiet.btn--sm", { type: "button" }, "移除前景");
-    const fgFoilF = segGroup("fgFoil", "前景鐳射", HC.FG_FOILS, draft.fgFoil, (v) => {
+    const fgRemove = h("button.btn.btn--quiet.btn--sm", { type: "button" }, HC.t("移除前景"));
+    const autoBtn = h("button.btn.btn--line.btn--sm", { type: "button" }, HC.t("從照片自動摳圖"));
+    const autoStatus = h("p.group__help.auto-status", { hidden: true, role: "status" });
+    autoBtn.addEventListener("click", async () => {
+      if (!draft.imageBlob) {
+        HC.toast(HC.t("請先選擇一張照片。"), "error");
+        return;
+      }
+      autoBtn.disabled = true;
+      autoStatus.hidden = false;
+      autoStatus.classList.remove("share__warn");
+      try {
+        const cut = await HC.cutout.run(draft.imageBlob, (stage, p) => {
+          autoStatus.textContent =
+            stage === "download"
+              ? HC.t("第一次使用要下載摳圖工具（約 8 MB）… {p}%", { p: Math.round(p * 100) })
+              : HC.t("正在找出照片裡的主體…");
+        });
+        const file = new File([cut], "cutout.png", { type: "image/png" });
+        draft.fgBlob = await HC.io.processImage(file, { keepAlpha: true });
+        setUrl("fg", draft.fgBlob);
+        refresh();
+        syncFg();
+        autoStatus.textContent = HC.t("摳好了。效果不理想的話，可以自己用其他工具去背後按「加入前景圖」上傳。");
+      } catch (e) {
+        autoStatus.textContent = e.message || HC.t("摳圖失敗，請換一張照片試試。");
+        autoStatus.classList.add("share__warn");
+      } finally {
+        autoBtn.disabled = false;
+      }
+    });
+    const fgFoilF = segGroup("fgFoil", HC.t("前景鐳射"), HC.FG_FOILS, draft.fgFoil, (v) => {
       draft.fgFoil = v;
       syncFoilFields();
       refresh();
@@ -231,17 +263,55 @@
     segs.fgFoil = fgFoilF;
     const fgFoilTune = h(
       "div.tune",
-      slider("fgFoilStrength", "前景鐳射強度", { min: 0, max: 200, step: 1, format: pct }),
-      slider("fgFoilHue", "前景鐳射色調", { min: 0, max: 360, step: 1, format: deg })
+      slider("fgFoilStrength", HC.t("前景鐳射強度"), { min: 0, max: 200, step: 1, format: pct }),
+      slider("fgFoilHue", HC.t("前景鐳射色調"), { min: 0, max: 360, step: 1, format: deg })
     );
+    /* Quicksand ------------------------------------------------------- */
+    const SAND_COLORS = [
+      { id: "#ffd26e", name: HC.t("金") },
+      { id: "#ff9ccf", name: HC.t("粉") },
+      { id: "#8fd3ff", name: HC.t("藍") },
+      { id: "#c9a8ff", name: HC.t("紫") },
+      { id: "#f4f6fa", name: HC.t("銀白") },
+    ];
+    const sandChk = h("input", { type: "checkbox", checked: !!draft.sand });
+    const sandColor = h("input.sand-color", { type: "color", value: draft.sandColor || "#ffd26e", "aria-label": HC.t("自訂流沙顏色") });
+    const sandSwatches = h("div.sand-swatches", { role: "radiogroup", "aria-label": HC.t("流沙顏色") });
+    const syncSandSwatches = () =>
+      sandSwatches.querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.c === draft.sandColor)));
+    SAND_COLORS.forEach((c) => {
+      const b = h("button.sand-swatch", { type: "button", role: "radio", title: c.name, "aria-label": c.name, dataset: { c: c.id }, style: "--c:" + c.id });
+      b.addEventListener("click", () => {
+        draft.sandColor = c.id;
+        sandColor.value = c.id;
+        syncSandSwatches();
+        refresh();
+      });
+      sandSwatches.appendChild(b);
+    });
+    sandColor.addEventListener("input", () => {
+      draft.sandColor = sandColor.value.toLowerCase();
+      syncSandSwatches();
+      refresh();
+    });
+    const sandColorField = h("div.field", h("span.field__label", HC.t("流沙顏色")), h("div.sand-row", sandSwatches, sandColor));
+    sandChk.addEventListener("change", () => {
+      draft.sand = sandChk.checked;
+      syncFoilFields();
+      refresh();
+    });
+    syncSandSwatches();
+
     const fgControls = h(
       "div.fg-controls",
-      slider("fgZoom", "前景大小", { min: 0.5, max: 2, step: 0.01, format: times }),
-      slider("fgX", "前景左右", { min: -50, max: 50, step: 1, format: signed }),
-      slider("fgY", "前景上下", { min: -50, max: 50, step: 1, format: signed }),
+      slider("fgZoom", HC.t("前景大小"), { min: 0.5, max: 2, step: 0.01, format: times }),
+      slider("fgX", HC.t("前景左右"), { min: -50, max: 50, step: 1, format: signed }),
+      slider("fgY", HC.t("前景上下"), { min: -50, max: 50, step: 1, format: signed }),
       fgFoilF,
       fgFoilTune,
-      resetBtn("重設前景", ["fgZoom", "fgX", "fgY", "fgFoil", "fgFoilStrength", "fgFoilHue"])
+      h("label.check", sandChk, h("span", HC.t("流沙：在照片和前景之間流動，佔畫面的一半"))),
+      sandColorField,
+      resetBtn(HC.t("重設前景"), ["fgZoom", "fgX", "fgY", "fgFoil", "fgFoilStrength", "fgFoilHue"])
     );
 
     function syncFoilFields() {
@@ -252,10 +322,13 @@
       fgControls.hidden = !hasFg;
       blurF.classList.toggle("is-off", !hasFg);
       blurNote.hidden = hasFg;
+      sandColorField.hidden = !draft.sand;
+      if (typeof turnBtn !== "undefined") turnBtn.hidden = !(hasFg && draft.sand);
       areaF.disable("frame", draft.frame === "none");
     }
     const syncFg = () => {
-      fgText.textContent = draft.fgBlob ? "更換前景圖" : "加入前景圖";
+      fgText.textContent = draft.fgBlob ? HC.t("更換前景圖") : HC.t("加入前景圖");
+      autoBtn.disabled = !draft.imageBlob;
       fgRemove.hidden = !draft.fgBlob;
       syncFoilFields();
     };
@@ -280,15 +353,15 @@
     });
 
     /* Text -------------------------------------------------------------- */
-    const titleField = text("標題", { value: draft.title, max: 24, placeholder: "例如：夏天的海" }, (v) => {
+    const titleField = text(HC.t("標題"), { value: draft.title, max: 24, placeholder: HC.t("例如：夏天的海") }, (v) => {
       draft.title = v;
       refresh();
     });
-    const subField = text("副標", { value: draft.subtitle, max: 40, placeholder: "地點、日期或一句話" }, (v) => {
+    const subField = text(HC.t("副標"), { value: draft.subtitle, max: 40, placeholder: HC.t("地點、日期或一句話") }, (v) => {
       draft.subtitle = v;
       refresh();
     });
-    const serialField = text("編號", { value: draft.serial, max: 12, placeholder: "例如：001/100" }, (v) => {
+    const serialField = text(HC.t("編號"), { value: draft.serial, max: 12, placeholder: HC.t("例如：001/100") }, (v) => {
       draft.serial = v;
       refresh();
     });
@@ -299,7 +372,7 @@
     });
 
     /* Frame ------------------------------------------------------------- */
-    const frameF = segGroup("frame", "顏色", HC.FRAMES, draft.frame, (v) => {
+    const frameF = segGroup("frame", HC.t("顏色"), HC.FRAMES, draft.frame, (v) => {
       draft.frame = v;
       if (v === "none" && draft.area === "frame") {
         draft.area = "full";
@@ -310,76 +383,82 @@
     }, (o) => h("span.frame-chip", { "aria-hidden": "true", dataset: { frame: o.id } }));
 
     /* Save -------------------------------------------------------------- */
-    const saveBtn = h("button.btn.btn--ink.btn--wide", { type: "submit" }, editing ? "儲存變更" : "儲存到展廳");
+    const saveBtn = h("button.btn.btn--ink.btn--wide", { type: "submit" }, editing ? HC.t("儲存變更") : HC.t("儲存到展廳"));
     const form = h(
       "form.maker__form",
       { novalidate: true },
-      h("div.maker__head", h("h1.maker__title", editing ? "編輯卡片" : "製作卡片"), h("p.maker__lead", "照片在你的瀏覽器裡處理和儲存。只有按下「分享」的卡片才會上傳。")),
+      h("div.maker__head", h("h1.maker__title", editing ? HC.t("編輯卡片") : HC.t("製作卡片")), h("p.maker__lead", HC.t("照片在你的瀏覽器裡處理和儲存。只有按下「分享」的卡片才會上傳。"))),
       h(
         "fieldset.group",
-        h("legend.group__title", "照片"),
+        h("legend.group__title", HC.t("照片")),
         photoBtn
       ),
       h(
         "fieldset.group",
-        h("legend.group__title", "背景照片"),
+        h("legend.group__title", HC.t("背景照片")),
         ...bgFields,
         blurF,
         blurNote,
-        resetBtn("重設背景", ["zoom", "posX", "posY", "bgBlur"])
+        resetBtn(HC.t("重設背景"), ["zoom", "posX", "posY", "bgBlur"])
       ),
       h(
         "fieldset.group",
-        h("legend.group__title", "背景鐳射"),
+        h("legend.group__title", HC.t("背景鐳射")),
         foilF,
         areaF,
         foilTune,
-        resetBtn("重設鐳射數值", ["foilStrength", "foilScale", "foilHue"])
+        resetBtn(HC.t("重設鐳射數值"), ["foilStrength", "foilScale", "foilHue"])
       ),
       h(
         "fieldset.group",
-        h("legend.group__title", "前景圖層", h("span.group__opt", "選用")),
-        h("p.group__help", "一張去背的 PNG（例如照片裡的人物），會浮在照片上方，傾斜時前後景分開移動，產生立體感。前景可以有自己的鐳射和位置。"),
-        h("div.group__row", fgLabel, fgRemove),
+        h("legend.group__title", HC.t("前景圖層"), h("span.group__opt", HC.t("選用"))),
+        h("p.group__help", HC.t("一張去背的 PNG（例如照片裡的人物），會浮在照片上方，傾斜時前後景分開移動，產生立體感。前景可以有自己的鐳射和位置。")),
+        h("div.group__row", fgLabel, autoBtn, fgRemove),
+        h("p.group__help", HC.t("「自動摳圖」會用電腦在你的裝置上找出照片裡的主體，照片不會上傳。主體清楚、背景單純的照片效果最好，不保證每張都摳得乾淨。")),
+        autoStatus,
         fgControls
       ),
       h(
         "fieldset.group",
-        h("legend.group__title", "文字"),
+        h("legend.group__title", HC.t("文字")),
         titleField,
         subField,
         serialField,
-        h("label.check", showText, h("span", "在卡片上顯示文字"))
+        h("label.check", showText, h("span", HC.t("在卡片上顯示文字")))
       ),
-      h("fieldset.group", h("legend.group__title", "邊框"), frameF),
+      h("fieldset.group", h("legend.group__title", HC.t("邊框")), frameF),
       h(
         "div.maker__actions",
         saveBtn,
-        h("a.btn.btn--quiet", { href: editing ? "#/card/" + editing.id : "#/" }, "取消")
+        h("a.btn.btn--quiet", { href: editing ? "#/card/" + editing.id : "#/" }, HC.t("取消"))
       )
     );
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!draft.imageBlob) {
-        HC.toast("請先選擇一張照片。", "error");
+        HC.toast(HC.t("請先選擇一張照片。"), "error");
         photoInput.focus();
         return;
       }
       saveBtn.disabled = true;
       try {
         const id = await HC.store.put(Object.assign({}, draft, { title: draft.title.trim() }));
-        HC.toast(editing ? "已儲存變更" : "已儲存到展廳");
+        HC.toast(editing ? HC.t("已儲存變更") : HC.t("已儲存到展廳"));
         HC.go("#/card/" + id);
       } catch (err) {
         saveBtn.disabled = false;
-        HC.toast("儲存失敗：瀏覽器的儲存空間可能已滿。請刪除幾張舊卡片再試。", "error");
+        HC.toast(HC.t("儲存失敗：瀏覽器的儲存空間可能已滿。請刪除幾張舊卡片再試。"), "error");
       }
     });
 
     root.appendChild(
       h(
         "div.maker",
-        h("div.maker__preview", stage, h("p.maker__hint", h("span.hint-desk", "把滑鼠移到預覽上看看效果"), h("span.hint-touch", "拖曳預覽看看效果"))),
+        h(
+          "div.maker__preview",
+          stage,
+          h("p.maker__hint", h("span.hint-desk", HC.t("把滑鼠移到預覽上看看效果")), h("span.hint-touch", HC.t("拖曳預覽看看效果")), turnBtn)
+        ),
         form
       )
     );
@@ -388,7 +467,7 @@
     refresh();
 
     return {
-      title: editing ? "編輯卡片" : "製作卡片",
+      title: editing ? HC.t("編輯卡片") : HC.t("製作卡片"),
       destroy() {
         card.destroy();
         setUrl("bg", null);

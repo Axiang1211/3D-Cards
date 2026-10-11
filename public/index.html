@@ -23,41 +23,49 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body data-view="gallery">
-  <a class="skip" href="#view">跳到主要內容</a>
+  <a class="skip" href="#view" data-i18n="跳到主要內容">跳到主要內容</a>
 
   <header class="site-head">
     <a class="brand" href="#/" data-nav="brand">
       <img class="brand__mark" src="brand/logo-mark-64.png" srcset="brand/logo-mark-128.png 2x" alt="" width="40" height="40">
       <span data-site-name>3D Cards</span>
     </a>
-    <nav class="site-nav" aria-label="主要">
-      <a class="site-nav__link" href="#/" data-nav="gallery">展廳</a>
-      <a class="btn btn--ink btn--sm" href="#/create" data-nav="create">製作卡片</a>
+    <nav class="site-nav" aria-label="主要" data-i18n-label="主要">
+      <a class="site-nav__link" href="#/" data-nav="gallery" data-i18n="展廳">展廳</a>
+      <a class="btn btn--ink btn--sm" href="#/create" data-nav="create" data-i18n="製作卡片">製作卡片</a>
     </nav>
   </header>
 
   <main id="view" tabindex="-1"></main>
 
   <footer class="site-foot">
-    <p>開源專案，以 MIT 授權釋出。照片只在你的瀏覽器裡處理，按下「分享」的卡片才會上傳。</p>
+    <p data-i18n="開源專案，以 MIT 授權釋出。照片只在你的瀏覽器裡處理，按下「分享」的卡片才會上傳。">開源專案，以 MIT 授權釋出。照片只在你的瀏覽器裡處理，按下「分享」的卡片才會上傳。</p>
     <span class="site-foot__links">
-      <a id="download-link" class="site-foot__link only-desk" href="#" rel="noopener" hidden>下載 Windows 電腦版</a>
-      <a id="repo-link" class="site-foot__link" href="#" rel="noopener">在 GitHub 查看原始碼</a>
+      <a id="download-link" class="site-foot__link only-desk" href="#" rel="noopener" hidden data-i18n="下載 Windows 電腦版">下載 Windows 電腦版</a>
+      <a id="repo-link" class="site-foot__link" href="#" rel="noopener" data-i18n="在 GitHub 查看原始碼">在 GitHub 查看原始碼</a>
+      <span id="lang-switch" class="lang-switch" role="group" data-i18n-label="語言" aria-label="語言">
+        <button type="button" data-lang="zh" lang="zh-Hant">中文</button>
+        <button type="button" data-lang="en" lang="en">English</button>
+      </span>
     </span>
   </footer>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <noscript><p class="noscript">這個網站需要 JavaScript 才能顯示卡片。</p></noscript>
+  <noscript><p class="noscript">這個網站需要 JavaScript 才能顯示卡片。 This site needs JavaScript to show the cards.</p></noscript>
 
   <script src="js/config.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/desktop.js"></script>
   <script src="gallery/gallery.js"></script>
   <script src="js/motion.js"></script>
   <script src="js/holo-card.js"></script>
   <script src="js/store.js"></script>
   <script src="js/io.js"></script>
+  <script src="js/cutout.js"></script>
   <script src="js/share.js"></script>
+  <script src="js/cloud.js"></script>
+  <script src="js/fullscreen.js"></script>
   <script src="js/view-gallery.js"></script>
   <script src="js/view-detail.js"></script>
   <script src="js/view-create.js"></script>

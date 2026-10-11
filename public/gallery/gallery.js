@@ -7,10 +7,12 @@
  * area         full | art | frame
  * frame        none | white | black | silver | gold
  * zoom         1 to 4      posX / posY   0 to 100 (focus point of the photo)
+ * en           optional English title / subtitle, shown when the site is in English
  */
 window.HC_GALLERY = [
   {
     "id": "ridgeline",
+    "en": { "title": "Ridgeline", "subtitle": "At dusk" },
     "title": "山稜線",
     "subtitle": "Ridgeline at dusk",
     "serial": "001",
@@ -25,6 +27,7 @@ window.HC_GALLERY = [
   },
   {
     "id": "constellation",
+    "en": { "title": "Star Chart", "subtitle": "Constellation" },
     "title": "星圖",
     "subtitle": "Constellation",
     "serial": "002",
@@ -39,6 +42,7 @@ window.HC_GALLERY = [
   },
   {
     "id": "tide",
+    "en": { "title": "Tide", "subtitle": "Night tide" },
     "title": "潮汐",
     "subtitle": "Night tide",
     "serial": "003",
@@ -53,6 +57,7 @@ window.HC_GALLERY = [
   },
   {
     "id": "glasshouse",
+    "en": { "title": "Glasshouse", "subtitle": "Leaves in the light" },
     "title": "溫室",
     "subtitle": "Glasshouse",
     "serial": "004",
@@ -67,6 +72,7 @@ window.HC_GALLERY = [
   },
   {
     "id": "night",
+    "en": { "title": "Last Tram", "subtitle": "Last tram home" },
     "title": "末班車",
     "subtitle": "Last tram home",
     "serial": "005",
@@ -81,6 +87,7 @@ window.HC_GALLERY = [
   },
   {
     "id": "eclipse",
+    "en": { "title": "Eclipse", "subtitle": "Black sun" },
     "title": "日蝕",
     "subtitle": "Eclipse",
     "serial": "006",

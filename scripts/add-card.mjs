@@ -102,6 +102,10 @@ for (const [k, [d, lo, hi]] of Object.entries(extra)) {
   if (v !== d) entry[k] = v;
 }
 if (card.fgFoil && card.fgFoil !== "none") entry.fgFoil = card.fgFoil;
+if (card.sand === true && card.fg) {
+  entry.sand = true;
+  if (/^#[0-9a-f]{6}$/i.test(card.sandColor || "")) entry.sandColor = card.sandColor.toLowerCase();
+}
 if (card.showText === false) entry.showText = false;
 list.push(entry);
 

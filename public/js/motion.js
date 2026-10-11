@@ -87,6 +87,7 @@
   /* card always rests flat in the hand. Double tap / recenter() resets. */
   /* ------------------------------------------------------------------ */
   const listeners = new Set();
+  const rawListeners = new Set(); // screen-mapped tilt in degrees, no recentering
   const RANGE = 22; // degrees of tilt that map to a full card tilt
   const DRIFT = 0.006; // how fast the neutral pose follows the hand
   let base = null;
@@ -121,6 +122,7 @@
       case 270: tx = -b; ty = g; break;
       default: tx = g; ty = b;
     }
+    rawListeners.forEach((fn) => fn(tx, ty));
     if (!base) base = { x: tx, y: ty };
     let dx = tx - base.x;
     let dy = ty - base.y;
@@ -200,6 +202,11 @@
     },
     recenter() {
       base = null;
+    },
+    /** Absolute tilt in degrees (gamma-like, beta-like) for gravity effects. */
+    subscribeRaw(fn) {
+      rawListeners.add(fn);
+      return () => rawListeners.delete(fn);
     },
     subscribe(fn) {
       listeners.add(fn);

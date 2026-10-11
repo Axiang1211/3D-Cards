@@ -16,15 +16,15 @@
       root.appendChild(
         h(
           "section.room.room--missing",
-          h("h1.room__missing-title", "找不到這張卡片"),
+          h("h1.room__missing-title", HC.t("找不到這張卡片")),
           h(
             "p",
-            "自己做的卡片只存在建立它的瀏覽器裡。若你換了瀏覽器、清除了網站資料，或連結裡的編號打錯了，就會看到這個畫面。"
+            HC.t("自己做的卡片只存在建立它的瀏覽器裡。若你換了瀏覽器、清除了網站資料，或連結裡的編號打錯了，就會看到這個畫面。")
           ),
-          h("a.btn.btn--light", { href: "#/" }, "回到展廳")
+          h("a.btn.btn--light", { href: "#/" }, HC.t("回到展廳"))
         )
       );
-      return { title: "找不到卡片" };
+      return { title: HC.t("找不到卡片") };
     }
 
     const all = await HC.cards.all();
@@ -39,14 +39,14 @@
     room.appendChild(
       h(
         "div.room__bar",
-        h("a.room__back", { href: "#/" }, h("span", { "aria-hidden": "true" }, "←"), "展廳"),
+        h("a.room__back", { href: "#/" }, h("span", { "aria-hidden": "true" }, "←"), HC.t("展廳")),
         all.length > 1
           ? h(
               "nav.room__pager",
-              { "aria-label": "切換卡片" },
-              h("a.room__step", { href: "#/card/" + prev.id, "aria-label": "上一張：" + (prev.title || "未命名") }, "‹"),
+              { "aria-label": HC.t("切換卡片") },
+              h("a.room__step", { href: "#/card/" + prev.id, "aria-label": HC.t("上一張：{title}", { title: prev.title || HC.t("未命名") }) }, "‹"),
               h("span.room__pos", `${idx + 1} / ${all.length}`),
-              h("a.room__step", { href: "#/card/" + next.id, "aria-label": "下一張：" + (next.title || "未命名") }, "›")
+              h("a.room__step", { href: "#/card/" + next.id, "aria-label": HC.t("下一張：{title}", { title: next.title || HC.t("未命名") }) }, "›")
             )
           : null
       )
@@ -59,7 +59,7 @@
     room.appendChild(stage);
 
     /* Info + tools ------------------------------------------------------ */
-    const foilPick = h("div.foil-pick", { role: "radiogroup", "aria-label": "鐳射樣式" });
+    const foilPick = h("div.foil-pick", { role: "radiogroup", "aria-label": HC.t("鐳射樣式") });
     HC.FOILS.forEach((f) => {
       const b = h(
         "button.foil-pick__btn",
@@ -75,57 +75,70 @@
       });
       foilPick.appendChild(b);
     });
-    const note = h("p.room__note", { hidden: true }, "只是試看，不會改動卡片。");
+    const note = h("p.room__note", { hidden: true }, HC.t("只是試看，不會改動卡片。"));
 
-    const flipBtn = h("button.btn.btn--light", { type: "button", onclick: () => card.flip() }, "翻到背面");
-    card.el.addEventListener("hc:flip", (e) => (flipBtn.textContent = e.detail ? "翻回正面" : "翻到背面"));
+    const turnBtn = data.sand && data.fg ? h("button.btn.btn--light", { type: "button", onclick: () => card.turn() }, HC.t("上下顛倒")) : null;
+    const flipBtn = h("button.btn.btn--light", { type: "button", onclick: () => card.flip() }, HC.t("翻到背面"));
+    card.el.addEventListener("hc:flip", (e) => (flipBtn.textContent = e.detail ? HC.t("翻回正面") : HC.t("翻到背面")));
 
     const gyroBtn = HC.gyroButton("btn btn--light");
     cleanups.push(gyroBtn._cleanup);
 
-    const exportBtn = h("button.btn.btn--light", { type: "button" }, "下載卡片檔");
+    const exportBtn = h("button.btn.btn--light", { type: "button" }, HC.t("下載卡片檔"));
     exportBtn.addEventListener("click", async () => {
       exportBtn.disabled = true;
       try {
         await HC.io.exportCard(data);
-        HC.toast("已下載卡片檔。在任何一台裝置上按「匯入卡片檔」就能打開。");
+        HC.toast(HC.t("已下載卡片檔。在任何一台裝置上按「匯入卡片檔」就能打開。"));
       } catch (e) {
-        HC.toast("無法下載這張卡片。若你是直接開啟本機檔案，請改用本機伺服器瀏覽。", "error");
+        HC.toast(HC.t("無法下載這張卡片。若你是直接開啟本機檔案，請改用本機伺服器瀏覽。"), "error");
       } finally {
         exportBtn.disabled = false;
       }
     });
 
-    const shareBtn = h("button.btn.btn--share", { type: "button" }, "分享");
+    const shareBtn = h("button.btn.btn--share", { type: "button" }, HC.t("分享"));
     const syncShare = () => {
       const cur = data.own && HC.share.current(data);
-      shareBtn.textContent = cur ? "分享中・查看連結" : "分享";
-      shareBtn.title = cur && cur.expiresAt ? "連結會在 " + HC.share.expiryText(cur.expiresAt) + "失效" : "";
+      shareBtn.textContent = cur ? HC.t("分享中・查看連結") : HC.t("分享");
+      shareBtn.title = cur && cur.expiresAt ? HC.t("連結會在 {date}失效。", { date: HC.share.expiryText(cur.expiresAt) }) : "";
     };
     shareBtn.addEventListener("click", () => HC.openShare(data, syncShare));
     syncShare();
 
+    const fsBtn = h("button.btn.btn--light", { type: "button", onclick: () => HC.openFullscreen(card.data) }, HC.t("全螢幕"));
+    // Phone: the main actions stay reachable at the bottom of the screen.
+    const dockShare = h("button.btn.btn--share", { type: "button", onclick: () => HC.openShare(data, syncShare) }, HC.t("分享"));
+    const dock = h(
+      "div.room__dock",
+      dockShare,
+      h("button.btn.btn--light", { type: "button", onclick: () => HC.openFullscreen(card.data) }, HC.t("全螢幕")),
+      h("button.btn.btn--light", { type: "button", onclick: () => card.flip() }, HC.t("翻面")),
+      data.sand && data.fg ? h("button.btn.btn--light", { type: "button", onclick: () => card.turn() }, HC.t("顛倒")) : null
+    );
+
     let ownTools = null;
     if (data.own) {
-      const del = h("button.btn.btn--danger", { type: "button" }, "刪除");
+      const del = h("button.btn.btn--danger", { type: "button" }, HC.t("刪除"));
       let armed = 0;
       del.addEventListener("click", async () => {
         if (!armed) {
-          del.textContent = "再按一次刪除";
+          del.textContent = HC.t("再按一次刪除");
           del.classList.add("is-armed");
           armed = setTimeout(() => {
             armed = 0;
-            del.textContent = "刪除";
+            del.textContent = HC.t("刪除");
             del.classList.remove("is-armed");
           }, 3500);
           return;
         }
         clearTimeout(armed);
         await HC.store.remove(data.id);
-        HC.toast("已刪除「" + (data.title || "未命名卡片") + "」");
+        if (HC.cloud) HC.cloud.noteDeleted(data.id);
+        HC.toast(HC.t("已刪除「{title}」", { title: data.title || HC.t("未命名卡片") }));
         HC.go("#/");
       });
-      ownTools = h("div.room__own", h("a.btn.btn--light", { href: "#/create/" + data.id }, "編輯"), del);
+      ownTools = h("div.room__own", h("a.btn.btn--light", { href: "#/create/" + data.id }, HC.t("編輯")), del);
     }
 
     const meta = h("p.placard__meta", HC.describe(data));
@@ -134,20 +147,23 @@
         "div.room__info",
         h(
           "div.placard.placard--room",
-          h("h1.placard__title", data.title || "未命名卡片"),
+          h("h1.placard__title", data.title || HC.t("未命名卡片")),
           data.subtitle ? h("p.placard__sub", data.subtitle) : null,
           meta,
-          data.own ? h("p.placard__own", "你做的卡片，只存在這個瀏覽器裡。") : null
+          data.own
+            ? h("p.placard__own", data.fromShare ? HC.t("從分享連結加入的卡片，已經存在你這裡，連結過期也看得到。") : window.HC_DESKTOP ? HC.t("你做的卡片，存在這台電腦的 3D Cards 裡。") : HC.t("你做的卡片，只存在這個瀏覽器裡。"))
+            : null
         ),
-        h("div.room__tools", foilPick, note, h("div.room__actions", shareBtn, flipBtn, gyroBtn, exportBtn), ownTools),
+        h("div.room__tools", foilPick, note, h("div.room__actions", shareBtn, fsBtn, flipBtn, turnBtn, gyroBtn, exportBtn), ownTools),
         h(
           "p.room__hint",
-          h("span.hint-desk", "移動滑鼠或拖曳來傾斜卡片，點一下翻面。方向鍵也能傾斜。"),
-          h("span.hint-touch", "用手指拖曳或轉動手機來傾斜卡片，點一下翻面。")
+          h("span.hint-desk", HC.t("移動滑鼠或拖曳來傾斜卡片，點一下翻面。方向鍵也能傾斜。")),
+          h("span.hint-touch", HC.t("用手指拖曳或轉動手機來傾斜卡片，點一下翻面。"))
         )
       )
     );
     root.appendChild(room);
+    root.appendChild(dock);
 
     /* Keyboard: [ and ] or PageUp/PageDown step through the collection. */
     const onKey = (e) => {
@@ -173,7 +189,7 @@
     });
 
     return {
-      title: data.title || "未命名卡片",
+      title: data.title || HC.t("未命名卡片"),
       destroy() {
         card.destroy();
         document.removeEventListener("keydown", onKey);

@@ -22,5 +22,11 @@ window.HC_CONFIG = {
    * Where the "下載電腦版" button points. This address always gives the newest
    * installer from the GitHub Releases page. Leave empty to hide the button.
    */
+  /*
+   * Google sign-in for cloud sync (website). The OAuth "Web application" client ID
+   * from Google Cloud Console. Leave empty to hide cloud sync. See docs/Google登入設定.md.
+   */
+  googleClientId: "",
+
   downloadUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe",
 };

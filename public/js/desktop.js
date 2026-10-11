@@ -71,27 +71,27 @@
       dlg.close();
     };
     const body = h("div.share__body");
-    const go = h("button.btn.btn--ink", { type: "button" }, "下載新版");
-    const later = h("button.btn.btn--quiet", { type: "button", onclick: close }, "稍後再說");
+    const go = h("button.btn.btn--ink", { type: "button" }, HC.t("下載新版"));
+    const later = h("button.btn.btn--quiet", { type: "button", onclick: close }, HC.t("稍後再說"));
     body.append(
-      h("p.share__note", `3D Cards ${latest} 已經推出，你目前使用的是 ${current}。`),
-      h("p.share__note", "更新後才能使用新功能。不更新也可以繼續使用目前的版本。"),
+      h("p.share__note", HC.t("3D Cards {latest} 已經推出，你目前使用的是 {current}。", { latest, current })),
+      h("p.share__note", HC.t("更新後才能使用新功能。不更新也可以繼續使用目前的版本。")),
       h("div.share__actions", go, later),
-      h("label.check", skip, h("span", "這個版本不再提醒"))
+      h("label.check", skip, h("span", HC.t("這個版本不再提醒")))
     );
     go.addEventListener("click", () => {
       openUrl(setupFor(release)).catch(() => openUrl(RELEASE_PAGE).catch(() => {}));
       body.replaceChildren(
-        h("p.share__note", "新版安裝檔正在你的瀏覽器裡下載。"),
-        h("p.share__note", "下載完成後，先關閉 3D Cards，再執行 3D-Cards-Setup.exe，就會更新成新版本。你做過的卡片都會保留。"),
-        h("div.share__actions", h("button.btn.btn--ink", { type: "button", onclick: () => dlg.close() }, "知道了"))
+        h("p.share__note", HC.t("新版安裝檔正在你的瀏覽器裡下載。")),
+        h("p.share__note", HC.t("下載完成後，先關閉 3D Cards，再執行 3D-Cards-Setup.exe，就會更新成新版本。你做過的卡片都會保留。")),
+        h("div.share__actions", h("button.btn.btn--ink", { type: "button", onclick: () => dlg.close() }, HC.t("知道了")))
       );
     });
     dlg.append(
       h(
         "div.share__head",
-        h("h2.share__title", { id: "upd-title" }, "有新版本"),
-        h("button.share__x", { type: "button", "aria-label": "關閉", onclick: close }, "×")
+        h("h2.share__title", { id: "upd-title" }, HC.t("有新版本")),
+        h("button.share__x", { type: "button", "aria-label": HC.t("關閉"), onclick: close }, "×")
       ),
       body
     );
@@ -109,12 +109,12 @@
       if (!res.ok) throw new Error("http " + res.status);
       release = await res.json();
     } catch (e) {
-      if (manual) HC.toast("現在無法連上 GitHub 檢查更新，請確認網路後再試。", "error");
+      if (manual) HC.toast(HC.t("現在無法連上 GitHub 檢查更新，請確認網路後再試。"), "error");
       return;
     }
     const latest = String(release.tag_name || "").replace(/^v/, "");
     if (!latest || !newer(latest, current)) {
-      if (manual) HC.toast(`你使用的 ${current} 已經是最新版本。`);
+      if (manual) HC.toast(HC.t("你使用的 {current} 已經是最新版本。", { current }));
       return;
     }
     let skipped = null;
@@ -130,5 +130,26 @@
     checkForUpdates: () => checkForUpdates(true),
   };
 
-  window.addEventListener("load", () => setTimeout(() => checkForUpdates(false), 2500));
+  /* .3dcard files double-clicked in Windows arrive here and are saved to My cards. */
+  async function openCardFiles(texts) {
+    let last = null;
+    for (const text of texts || []) {
+      try {
+        const res = await HC.io.saveImported(text);
+        last = res;
+        HC.toast(res.existed ? HC.t("這張卡片之前已經加入過了") : HC.t("已加入「{title}」", { title: res.title || HC.t("未命名卡片") }));
+      } catch (e) {
+        HC.toast(e.message || HC.t("匯入失敗。"), "error");
+      }
+    }
+    if (last) HC.go("#/card/" + last.id);
+  }
+
+  window.addEventListener("load", () => {
+    try {
+      T.core.invoke("take_opened_cards").then(openCardFiles).catch(() => {});
+      if (T.event && T.event.listen) T.event.listen("open-cards", (e) => openCardFiles(e.payload));
+    } catch (e) {}
+    setTimeout(() => checkForUpdates(false), 2500);
+  });
 })();
