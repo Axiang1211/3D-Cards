@@ -20,7 +20,13 @@
 1. **API 和服務** → **OAuth 同意畫面**（新版介面叫 **Google Auth Platform** → **品牌宣傳**）
 2. 應用程式名稱填 `3D Cards`，使用者支援電子郵件選你的信箱
 3. 目標對象選 **外部**
-4. 開發人員聯絡資訊填你的信箱，儲存
+4. **品牌宣傳**頁面還要填這幾欄，否則「發布應用程式」按鈕會是灰色的：
+   - 應用程式首頁：`https://3dcards.app.dreamsworld.top`
+   - 隱私權政策連結：`https://3dcards.app.dreamsworld.top/privacy.html`
+   - 授權網域：`dreamsworld.top`
+   - 開發人員聯絡資訊：你的信箱
+   - 應用程式標誌先**不要**上傳，上傳了就要等 Google 審核品牌
+   然後按儲存
 5. **資料存取**（或「範圍」）→ **新增或移除範圍**，勾選這三個：
    - `.../auth/drive.appdata`
    - `openid`
