@@ -259,6 +259,7 @@
   "這個網站需要 JavaScript 才能顯示卡片。": "This site needs JavaScript to show the cards.",
   "語言": "Language",
   "主要": "Main",
+  "隱私權政策": "Privacy",
   "登入連結已經過期，請重新登入。": "The sign-in link has expired. Please sign in again.",
   "已經用你的瀏覽器打開登入頁。請確認頁面上的確認碼和這裡一樣，再用 Google 登入：": "The sign-in page has opened in your browser. Check that it shows the same code as here, then sign in with Google:",
   "重新打開登入頁": "Open the sign-in page again",
