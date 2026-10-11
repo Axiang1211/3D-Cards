@@ -26,7 +26,7 @@ window.HC_CONFIG = {
    * Google sign-in for cloud sync (website). The OAuth "Web application" client ID
    * from Google Cloud Console. Leave empty to hide cloud sync. See docs/Google登入設定.md.
    */
-  googleClientId: "",
+  googleClientId: "210055593962-3ajro5cogq75030114aqmh737itftgcl.apps.googleusercontent.com",
 
   downloadUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe",
 };
