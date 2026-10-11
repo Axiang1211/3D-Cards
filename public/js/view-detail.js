@@ -98,7 +98,9 @@
 
     const shareBtn = h("button.btn.btn--share", { type: "button" }, "分享");
     const syncShare = () => {
-      shareBtn.textContent = data.own && HC.share.current(data) ? "分享中・查看連結" : "分享";
+      const cur = data.own && HC.share.current(data);
+      shareBtn.textContent = cur ? "分享中・查看連結" : "分享";
+      shareBtn.title = cur && cur.expiresAt ? "連結會在 " + HC.share.expiryText(cur.expiresAt) + "失效" : "";
     };
     shareBtn.addEventListener("click", () => HC.openShare(data, syncShare));
     syncShare();

@@ -8,12 +8,15 @@
  *   GET    /api/shares/:id/image   the card's photo (used for link previews)
  *   DELETE /api/shares/:id         remove a share (Authorization: Bearer <deleteToken or ADMIN_TOKEN>)
  *
+ * Shared cards expire after SHARE_DAYS days: KV deletes them on its own.
+ *
  *   GET    /s/:id                  the share page (index.html with link-preview tags)
  *
  * Storage: the KV namespace bound as SHARES (created automatically on first deploy).
  * Optional secret ADMIN_TOKEN lets the site owner delete any share.
  */
 
+const SHARE_DAYS = 14; // shared cards are deleted automatically after this many days
 const MAX_BODY = 7 * 1024 * 1024; // request size limit
 const MAX_IMAGES = 5 * 1024 * 1024; // decoded photo + foreground
 const ID_RE = /^[A-Za-z0-9]{8,12}$/;
@@ -138,19 +141,25 @@ async function createShare(request, env, url) {
   if (!id) return json({ error: "伺服器忙碌中，請稍後再試。" }, 503);
 
   const deleteToken = randomId(32);
-  const record = { v: 1, createdAt: Date.now(), tokenHash: await sha256(deleteToken), card };
+  const ttl = SHARE_DAYS * 24 * 60 * 60;
+  const createdAt = Date.now();
+  const expiresAt = createdAt + ttl * 1000;
+  const record = { v: 1, createdAt, expiresAt, tokenHash: await sha256(deleteToken), card };
   await env.SHARES.put("s:" + id, JSON.stringify(record), {
-    metadata: { title: card.title, createdAt: record.createdAt },
+    expirationTtl: ttl,
+    metadata: { title: card.title, createdAt, expiresAt },
   });
 
   const origin = url.origin;
-  return json({ id, url: `${origin}/s/${id}`, deleteToken }, 201);
+  return json({ id, url: `${origin}/s/${id}`, deleteToken, expiresAt }, 201);
 }
 
 async function getShare(env, id) {
   const rec = await env.SHARES.get("s:" + id, { type: "json", cacheTtl: 60 });
-  if (!rec) return json({ error: "這張分享的卡片不存在，可能已被刪除。" }, 404);
-  return json({ id, createdAt: rec.createdAt, card: rec.card }, 200, { "Cache-Control": "no-cache" });
+  if (!rec || (rec.expiresAt && rec.expiresAt < Date.now())) {
+    return json({ error: "這張分享的卡片已經失效。分享連結只保留 " + SHARE_DAYS + " 天，或分享的人已經停止分享。" }, 404);
+  }
+  return json({ id, createdAt: rec.createdAt, expiresAt: rec.expiresAt, card: rec.card }, 200, { "Cache-Control": "no-cache" });
 }
 
 async function shareImage(env, id) {

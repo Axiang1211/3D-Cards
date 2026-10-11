@@ -59,7 +59,8 @@
           h("p.placard__from", "有人分享了一張卡片給你"),
           h("h1.placard__title", data.title || "未命名卡片"),
           data.subtitle ? h("p.placard__sub", data.subtitle) : null,
-          h("p.placard__meta", HC.describe(data))
+          h("p.placard__meta", HC.describe(data)),
+          data.expiresAt ? h("p.placard__own", "這個分享連結會在 " + HC.share.expiryText(data.expiresAt) + "失效。喜歡的話可以存到你的卡片。") : null
         ),
         h("div.room__tools", h("div.room__actions", shareBtn, flipBtn, gyroBtn), h("div.room__actions", saveBtn, h("a.btn.btn--light", { href: "#/create" }, "自己做一張"))),
         h(

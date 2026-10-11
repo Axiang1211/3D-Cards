@@ -54,7 +54,16 @@
     return data;
   }
 
+  /** "10月25日" style date, plus how many days are left. */
+  function expiryText(ts) {
+    if (!ts) return "";
+    const d = new Date(ts);
+    const days = Math.max(0, Math.ceil((ts - Date.now()) / 86400000));
+    return `${d.getMonth() + 1}月${d.getDate()}日（還有 ${days} 天）`;
+  }
+
   HC.share = {
+    expiryText,
     apiBase,
     siteBase,
 
@@ -68,6 +77,7 @@
       const s = card && card.share;
       if (!s || !s.url) return null;
       if (s.ver !== (card.updatedAt || card.createdAt)) return null; // edited since sharing
+      if (s.expiresAt && s.expiresAt <= Date.now()) return null; // expired
       return s;
     },
 
@@ -78,7 +88,14 @@
       const old = card.share;
       const payload = await HC.io.payload(card);
       const data = await call("POST", "/api/shares", { card: payload });
-      const share = { id: data.id, url: data.url, token: data.deleteToken, at: Date.now(), ver: card.updatedAt || card.createdAt };
+      const share = {
+        id: data.id,
+        url: data.url,
+        token: data.deleteToken,
+        at: Date.now(),
+        expiresAt: data.expiresAt || 0,
+        ver: card.updatedAt || card.createdAt,
+      };
       await HC.store.patch(card.id, { share });
       card.share = share;
       // The card was edited after an earlier share: retire the old link.
@@ -97,7 +114,7 @@
     /** Fetch a shared card by id. */
     async fetch(id) {
       const data = await call("GET", "/api/shares/" + encodeURIComponent(id));
-      return Object.assign({}, HC.DEFAULTS, data.card, { id: "s-" + id, shareId: id, own: false, shared: true });
+      return Object.assign({}, HC.DEFAULTS, data.card, { id: "s-" + id, shareId: id, own: false, shared: true, expiresAt: data.expiresAt || 0 });
     },
   };
 
@@ -205,13 +222,21 @@
 
     if (!card.own) {
       const url = card.shared ? HC.share.siteBase().replace(/\/$/, "") + "/s/" + card.shareId : HC.share.galleryLink(card);
-      showLink(url, "任何人打開這個連結，都能看到並轉動這張卡片。", false);
+      const note = card.shared && card.expiresAt
+        ? "任何人打開這個連結，都能看到並轉動這張卡片。連結會在 " + expiryText(card.expiresAt) + "失效。"
+        : "任何人打開這個連結，都能看到並轉動這張卡片。";
+      showLink(url, note, false);
       return;
     }
 
     const existing = HC.share.current(card);
     if (existing) {
-      showLink(existing.url, "這張卡片已經分享過了。任何人打開連結都能看到它。", true);
+      showLink(
+        existing.url,
+        "這張卡片已經分享過了。任何人打開連結都能看到它。" +
+          (existing.expiresAt ? "連結會在 " + expiryText(existing.expiresAt) + "失效。" : ""),
+        true
+      );
       return;
     }
 
@@ -219,9 +244,13 @@
     body.replaceChildren(
       h(
         "p.share__note",
-        "建立連結時，卡片和照片會上傳到網站的伺服器，任何拿到連結的人都能看到。之後隨時可以停止分享，連結就會失效。"
+        "建立連結時，卡片和照片會上傳到網站的伺服器，任何拿到連結的人都能看到。連結會保留 14 天，之後自動失效；你也可以隨時停止分享。"
       ),
-      card.share ? h("p.share__note.share__warn", "你在上次分享後編輯過這張卡片。建立新連結後，舊連結會失效。") : null,
+      card.share && card.share.expiresAt && card.share.expiresAt <= Date.now()
+        ? h("p.share__note.share__warn", "上次的分享連結已經過期了，可以建立一個新的。")
+        : card.share
+          ? h("p.share__note.share__warn", "你在上次分享後編輯過這張卡片。建立新連結後，舊連結會失效。")
+          : null,
       h("div.share__actions", go, h("button.btn.btn--quiet", { type: "button", onclick: close }, "取消"))
     );
     go.focus();
@@ -231,7 +260,11 @@
       try {
         const s = await HC.share.create(card);
         if (onChange) onChange();
-        showLink(s.url, "連結建立好了。任何人打開它都能看到並轉動這張卡片。", true);
+        showLink(
+          s.url,
+          "連結建立好了。任何人打開它都能看到並轉動這張卡片。" + (s.expiresAt ? "連結會在 " + expiryText(s.expiresAt) + "失效。" : ""),
+          true
+        );
       } catch (e) {
         go.disabled = false;
         go.textContent = "再試一次";
