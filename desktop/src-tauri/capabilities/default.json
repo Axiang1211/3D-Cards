@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the 3D Cards window may do: read the app version and open links in the normal browser.",
+  "windows": ["main"],
+  "permissions": ["core:default", "opener:default"]
+}

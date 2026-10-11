@@ -103,16 +103,18 @@
 
 ## Windows 電腦版
 
-不想開瀏覽器，可以安裝電腦版。電腦版和網站的功能一樣，沒有網路也能做卡片（分享連結需要網路）。
+不想開瀏覽器，可以安裝電腦版。電腦版和網站的功能一樣，沒有網路也能做卡片（分享連結需要網路）。安裝檔只有幾 MB。
 
 1. 下載 [3D-Cards-Setup.exe](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe)，或到這個 GitHub 頁面右側的 **Releases** 下載
 2. 雙擊執行，照著畫面安裝，桌面會出現 3D Cards 的圖示
 
 第一次執行時，Windows 可能會顯示「Windows 已保護您的電腦」。這是因為程式沒有購買數位簽章，按 **其他資訊**，再按 **仍要執行** 就能安裝。
 
+電腦版使用 Windows 內建的 Edge 瀏覽器核心（WebView2）。Windows 10 和 11 通常已經有了；少數電腦沒有的話，安裝程式會自動下載。
+
 **更新**：每次打開電腦版，它會到 GitHub 檢查有沒有新版本。有的話會問你要不要更新：
 
-- **立即更新**：自動下載，重新啟動後就是新版本
+- **下載新版**：用瀏覽器下載新的安裝檔，關閉 3D Cards 後執行它，就會換成新版本，做過的卡片都會保留
 - **稍後再說**：繼續使用目前的版本，但不會有新功能
 - 勾選 **這個版本不再提醒**，直到下一個新版本推出前都不會再問
 
@@ -156,10 +158,11 @@ public/
   js/view-shared.js      別人分享的卡片頁
   js/share.js            分享連結
   js/config.js           網站設定
+  js/desktop.js          電腦版專用：外部連結、版本檢查
   brand/                 Logo 和網站圖示
   gallery/gallery.js     展廳裡的示範卡片清單
 src/worker.js            分享功能的伺服器（Cloudflare Worker）
-desktop/                 Windows 電腦版（Electron）
+desktop/                 Windows 電腦版（Tauri）
 scripts/
   add-card.mjs           把卡片檔加入示範展廳（需要 Node.js）
   make-demo-art.py       重新產生示範卡片的圖（需要 Python）
