@@ -150,10 +150,10 @@ body[data-view="detail"] .site-nav .btn--ink { background: var(--room-ink); colo
 .site-nav .btn[aria-current] { display: none; }
 
 .site-foot {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 14px 32px;
   padding: 32px var(--gutter) calc(32px + env(safe-area-inset-bottom));
   font-size: 13px;
   color: var(--muted);
@@ -708,7 +708,13 @@ body[data-view="detail"] .toast[data-kind="error"] { background: var(--danger); 
 
 .hero__download { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-top: 10px; font-size: 13px; color: var(--muted); }
 .hero__download a { color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
-.site-foot__links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.site-foot__links { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; line-height: 1.4; }
+.site-foot__links > * { flex: none; white-space: nowrap; }
+/* Same layout in every language: text on the left, links on the right, one row. */
+@media (min-width: 900px) {
+  .site-foot { grid-template-columns: minmax(0, 1fr) auto; }
+  .site-foot__links { flex-wrap: nowrap; justify-content: flex-end; }
+}
 
 .btn--share { background: var(--room-ink); color: var(--room); }
 .btn--share:hover { background: #fff; }
@@ -745,7 +751,7 @@ body[data-view="detail"] .toast[data-kind="error"] { background: var(--danger); 
 .tune.is-off { opacity: .4; pointer-events: none; }
 .fg-controls { padding: 18px 0 0; border-top: 1px dashed var(--rule); }
 .fg-controls[hidden] { display: none; }
-.site-foot__btn { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.site-foot__btn { display: inline-block; margin: 0; padding: 0; border: 0; background: none; font: inherit; line-height: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
 /* Maker: quicksand colour */
 .sand-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
