@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Holo Card</title>
+  <meta name="description" content="上傳照片，做成會跟著滑鼠與手機傾斜、帶有鐳射光澤的 3D 卡片。開源，免費，照片不會上傳。">
+  <meta name="theme-color" content="#dde0e3">
+  <meta property="og:title" content="Holo Card：鐳射卡片產生器">
+  <meta property="og:description" content="上傳照片，做成會跟著視角變化光澤的 3D 鐳射卡片。">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Noto+Sans+TC:wght@400..700&display=swap">
+  <link rel="stylesheet" href="css/holo-card.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-view="gallery">
+  <a class="skip" href="#view">跳到主要內容</a>
+
+  <header class="site-head">
+    <a class="brand" href="#/" data-nav="brand">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span data-site-name>Holo Card</span>
+    </a>
+    <nav class="site-nav" aria-label="主要">
+      <a class="site-nav__link" href="#/" data-nav="gallery">展廳</a>
+      <a class="btn btn--ink btn--sm" href="#/create" data-nav="create">製作卡片</a>
+    </nav>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <footer class="site-foot">
+    <p>開源專案，以 MIT 授權釋出。照片只在你的瀏覽器裡處理，不會上傳。</p>
+    <a id="repo-link" class="site-foot__link" href="#" rel="noopener">在 GitHub 查看原始碼</a>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <noscript><p class="noscript">這個網站需要 JavaScript 才能顯示卡片。</p></noscript>
+
+  <script src="js/config.js"></script>
+  <script src="gallery/gallery.js"></script>
+  <script src="js/motion.js"></script>
+  <script src="js/holo-card.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/io.js"></script>
+  <script src="js/view-gallery.js"></script>
+  <script src="js/view-detail.js"></script>
+  <script src="js/view-create.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

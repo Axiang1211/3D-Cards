@@ -1,0 +1,19 @@
+{
+  "name": "holo-cards",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Turn photos into holographic 3D cards that tilt with the mouse and the phone's gyroscope.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "add-card": "node scripts/add-card.mjs",
+    "art": "python3 scripts/make-demo-art.py"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,352 @@
+/*
+ * holo-card.css
+ * Every effect is driven by custom properties written by holo-card.js:
+ *   --rx --ry   tilt in degrees          --mx --my  light position (%)
+ *   --dx --dy   pointer offset, -1..1    --bgx --bgy foil position (%)
+ *   --o         foil strength, 0..1      --ang      prism angle
+ *   --lift      hover scale              --flip     0deg / 180deg
+ * Sizes use cqw (1% of the card width) so a card looks identical at any size.
+ */
+
+.hc {
+  --rx: 0deg; --ry: 0deg; --mx: 50%; --my: 50%; --dx: 0; --dy: 0; --hyp: 0;
+  --bgx: 50%; --bgy: 50%; --ang: 0deg; --o: .32; --lift: 1; --flip: 0deg;
+  --zoom: 1; --px: 50%; --py: 50%;
+
+  --radius: 4.8cqw;
+  --in: 4.6cqw;          /* frame thickness */
+  --band: 27cqw;         /* text band below the photo when the card has a frame */
+  --frame-bg: #f3f3f0;
+  --frame-ink: #1d1f24;
+  --screen-k: .16;       /* how much foil shows on dark areas */
+
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--font-card, "Instrument Sans", "Noto Sans TC", system-ui, sans-serif);
+}
+.hc--drag { touch-action: none; cursor: grab; }
+.hc--drag:active { cursor: grabbing; }
+.hc--flippable { cursor: pointer; }
+.hc:focus-visible { outline: none; }
+.hc:focus-visible .hc__face { box-shadow: 0 0 0 .6cqw #fff, 0 0 0 1.4cqw #1c1e22; }
+
+/* Shadow lives outside the tilt so it can slide away from the light. */
+.hc__shadow {
+  position: absolute;
+  inset: 6% 7% 2% 7%;
+  border-radius: var(--radius);
+  background: rgba(10, 12, 20, .42);
+  filter: blur(4.5cqw);
+  transform:
+    translate(calc(var(--dx) * -4cqw), calc(5cqw + var(--dy) * -3cqw))
+    scale(calc(.96 * var(--lift)));
+  opacity: .9;
+  pointer-events: none;
+}
+
+.hc__tilt {
+  position: absolute;
+  inset: 0;
+  transform: perspective(380cqw) rotateX(var(--rx)) rotateY(var(--ry)) scale(var(--lift));
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.hc__flip {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateY(var(--flip));
+}
+.hc__face {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  isolation: isolate;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background: var(--frame-bg);
+  box-shadow: inset 0 0 0 .25cqw rgba(255, 255, 255, .18);
+}
+.hc__back { transform: rotateY(180deg); }
+
+/* ------------------------------------------------------------------ */
+/* Frames                                                              */
+/* ------------------------------------------------------------------ */
+.hc[data-frame="white"]  { --frame-bg: #f3f3f0; --frame-ink: #1d1f24; }
+.hc[data-frame="black"]  { --frame-bg: #17181c; --frame-ink: #f1f1ef; --screen-k: .32; }
+.hc[data-frame="silver"] { --frame-bg: linear-gradient(140deg, #e7eaee 0%, #a3abb5 38%, #f1f3f5 55%, #8f98a3 100%); --frame-ink: #1d2026; }
+.hc[data-frame="gold"]   { --frame-bg: linear-gradient(140deg, #f5e2a8 0%, #bf9142 40%, #fbedc1 56%, #a07429 100%); --frame-ink: #2b1e08; }
+.hc[data-frame="none"]   { --frame-bg: #20222a; --frame-ink: #fff; }
+
+/* ------------------------------------------------------------------ */
+/* Artwork and 2.5D parallax                                           */
+/* ------------------------------------------------------------------ */
+.hc__art {
+  position: absolute;
+  inset: var(--in) var(--in) var(--band) var(--in);
+  border-radius: 2.2cqw;
+  overflow: hidden;
+  background: #2a2c34;
+}
+.hc[data-frame="none"] .hc__art,
+.hc.hc--notext:not([data-frame="none"]) .hc__art { border-radius: 2.2cqw; }
+.hc[data-frame="none"] .hc__art { inset: 0; border-radius: 0; }
+.hc.hc--notext:not([data-frame="none"]) .hc__art { bottom: var(--in); }
+
+.hc__bg,
+.hc__fg {
+  position: absolute;
+  left: -6%;
+  top: -6%;
+  width: 112%;
+  height: 112%;
+  max-width: none;
+  object-fit: cover;
+  object-position: var(--px) var(--py);
+  pointer-events: none;
+}
+/* The photo drifts against the tilt, the cut-out drifts with it: depth. */
+.hc__bg {
+  transform: translate(calc(var(--dx) * -2.6cqw), calc(var(--dy) * -2.6cqw)) scale(var(--zoom));
+}
+.hc__fg {
+  transform: translate(calc(var(--dx) * 3.2cqw), calc(var(--dy) * 3.2cqw)) scale(var(--zoom));
+  filter: drop-shadow(0 1.6cqw 2cqw rgba(0, 0, 0, .35));
+}
+.hc__bg[hidden], .hc__fg[hidden] { display: none; }
+
+/* ------------------------------------------------------------------ */
+/* Text                                                                */
+/* ------------------------------------------------------------------ */
+.hc__text {
+  position: absolute;
+  left: calc(var(--in) + 1.4cqw);
+  right: calc(var(--in) + 1.4cqw);
+  bottom: 0;
+  height: var(--band);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.6cqw;
+  color: var(--frame-ink);
+  transform: translate(calc(var(--dx) * .9cqw), calc(var(--dy) * .9cqw));
+  pointer-events: none;
+}
+.hc--notext .hc__text { display: none; }
+.hc__title {
+  margin: 0;
+  font-size: 7.4cqw;
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -.012em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hc__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 3cqw;
+  font-size: 3.7cqw;
+  line-height: 1.2;
+}
+.hc__sub {
+  opacity: .72;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hc__serial {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  opacity: .62;
+}
+.hc[data-frame="none"] .hc__text {
+  left: 0;
+  right: 0;
+  height: auto;
+  padding: 22cqw 7cqw 7cqw;
+  color: #fff;
+  background: linear-gradient(to top, rgba(8, 9, 14, .62), rgba(8, 9, 14, .28) 55%, transparent);
+  text-shadow: 0 .3cqw 1.2cqw rgba(0, 0, 0, .35);
+}
+
+/* ------------------------------------------------------------------ */
+/* Foil                                                                */
+/* Two copies of the same pattern: color-dodge makes light areas burn  */
+/* with colour, a faint screen copy lets dark areas shimmer too.       */
+/* ------------------------------------------------------------------ */
+.hc__foil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-size: 260% 260%;
+  background-position: var(--bgx) var(--bgy);
+}
+.hc__foil--dodge  { mix-blend-mode: color-dodge; opacity: var(--o); }
+.hc__foil--screen { mix-blend-mode: screen; opacity: calc(var(--o) * var(--screen-k)); }
+
+/* Where the foil sits. */
+.hc[data-area="art"] .hc__front .hc__foil {
+  inset: var(--in) var(--in) var(--band) var(--in);
+  border-radius: 2.2cqw;
+}
+.hc[data-area="art"][data-frame="none"] .hc__front .hc__foil { inset: 0; border-radius: 0; }
+.hc[data-area="art"].hc--notext .hc__front .hc__foil { bottom: var(--in); }
+.hc[data-area="frame"] .hc__front .hc__foil {
+  padding: var(--in) var(--in) var(--band) var(--in);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.hc[data-area="frame"].hc--notext .hc__front .hc__foil { padding-bottom: var(--in); }
+
+/* Rainbow: wide diagonal spectrum crossed by fine diffraction lines. */
+.hc[data-foil="rainbow"] .hc__foil {
+  background-image:
+    repeating-linear-gradient(-62deg,
+      rgba(0, 0, 0, .55) 0, rgba(0, 0, 0, .55) .9%,
+      rgba(255, 255, 255, .4) 1.5%, rgba(0, 0, 0, .55) 2.1%),
+    repeating-linear-gradient(118deg,
+      hsl(350 100% 70%) 0%, hsl(32 100% 66%) 3.5%, hsl(62 100% 64%) 7%,
+      hsl(140 90% 62%) 10.5%, hsl(190 100% 64%) 14%, hsl(235 100% 72%) 17.5%,
+      hsl(290 95% 72%) 21%, hsl(350 100% 70%) 24.5%);
+  background-blend-mode: soft-light, normal;
+  background-size: 180% 180%, 300% 300%;
+  background-position: calc(100% - var(--bgx)) var(--bgy), var(--bgx) var(--bgy);
+  filter: brightness(.56) contrast(1.45) saturate(.9);
+}
+
+/* Stardust: two glitter layers at different scales slide against each */
+/* other, so individual flecks wink on and off as the card tilts.      */
+.hc[data-foil="stardust"] .hc__foil {
+  background-image:
+    var(--hc-sparkle, none),
+    var(--hc-sparkle, none),
+    repeating-linear-gradient(128deg,
+      hsl(200 100% 70%) 0%, hsl(270 100% 74%) 6%, hsl(330 100% 72%) 12%,
+      hsl(40 100% 68%) 18%, hsl(160 90% 64%) 24%, hsl(200 100% 70%) 30%);
+  background-blend-mode: color-dodge, multiply, normal;
+  background-size: 34cqw 34cqw, 51cqw 51cqw, 300% 300%;
+  background-position:
+    calc(var(--dx) * 11cqw) calc(var(--dy) * 11cqw),
+    calc(var(--dx) * -7cqw) calc(var(--dy) * -7cqw),
+    var(--bgx) var(--bgy);
+  filter: brightness(.62) contrast(1.6) saturate(1);
+}
+.hc[data-foil="stardust"] { --screen-k: .28; }
+
+/* Prism: a spectrum wheel that turns with the tilt, over fine rings.  */
+.hc[data-foil="prism"] .hc__foil {
+  background-image:
+    repeating-radial-gradient(circle at var(--mx) var(--my),
+      rgba(0, 0, 0, .5) 0, rgba(255, 255, 255, .35) 1.6cqw, rgba(0, 0, 0, .5) 3.2cqw),
+    conic-gradient(from var(--ang) at var(--mx) var(--my),
+      hsl(0 100% 70%), hsl(55 100% 66%), hsl(120 90% 64%), hsl(185 100% 66%),
+      hsl(240 100% 74%), hsl(300 95% 72%), hsl(360 100% 70%));
+  background-blend-mode: soft-light, normal;
+  background-size: 100% 100%, 100% 100%;
+  background-position: center;
+  filter: brightness(.5) contrast(1.4) saturate(.85);
+}
+
+/* Metal: brushed lines with a band of light that sweeps across.       */
+.hc[data-foil="metal"] .hc__foil {
+  background-image:
+    linear-gradient(100deg,
+      transparent calc(var(--bgx) - 30%), rgba(255, 255, 255, .95) var(--bgx), transparent calc(var(--bgx) + 30%)),
+    repeating-linear-gradient(90deg,
+      rgba(255, 255, 255, .22) 0, rgba(255, 255, 255, .22) .35cqw, rgba(0, 0, 0, .25) .35cqw, rgba(0, 0, 0, .25) .7cqw),
+    linear-gradient(170deg, hsl(195 70% 62%), hsl(260 55% 64%) 45%, hsl(30 80% 64%));
+  background-blend-mode: overlay, overlay, normal;
+  background-size: 100% 100%, 100% 100%, 100% 260%;
+  background-position: center, center, 50% var(--bgy);
+  filter: brightness(.5) contrast(1.35);
+}
+
+/* Gloss: no foil, only the glare. */
+.hc[data-foil="gloss"] .hc__front .hc__foil { display: none; }
+
+/* ------------------------------------------------------------------ */
+/* Glare: a soft light that follows the pointer.                       */
+/* ------------------------------------------------------------------ */
+.hc__glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: calc(.25 + var(--o) * .75);
+  background: radial-gradient(farthest-corner circle at var(--mx) var(--my),
+    rgba(255, 255, 255, .85) 6%, rgba(255, 255, 255, .45) 24%, rgba(0, 0, 0, .4) 92%);
+}
+.hc[data-foil="gloss"] .hc__glare {
+  mix-blend-mode: soft-light;
+  opacity: calc(.45 + var(--o) * .55);
+  background: radial-gradient(farthest-corner circle at var(--mx) var(--my),
+    rgba(255, 255, 255, 1) 4%, rgba(255, 255, 255, .55) 22%, rgba(0, 0, 0, .55) 95%);
+}
+
+/* ------------------------------------------------------------------ */
+/* Back                                                                */
+/* ------------------------------------------------------------------ */
+.hc__back {
+  background: #191b22;
+  color: #eef0f3;
+  display: grid;
+  place-items: center;
+}
+.hc__back-pattern {
+  position: absolute;
+  inset: var(--in);
+  border-radius: 2.2cqw;
+  border: .35cqw solid rgba(255, 255, 255, .14);
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, .05) 0 .35cqw, transparent .35cqw 3cqw),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, .05) 0 .35cqw, transparent .35cqw 3cqw),
+    radial-gradient(circle at 50% 45%, #2b2e3a, #15161c 75%);
+}
+.hc__back-mark {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4cqw;
+  font-size: 5cqw;
+  font-weight: 600;
+  letter-spacing: .32em;
+  text-indent: .32em;
+}
+.hc__back-logo {
+  width: 24cqw;
+  height: 24cqw;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 210deg, #ff8fb1, #ffd88a, #9cf5c4, #8fd8ff, #b9a2ff, #ff8fb1);
+  -webkit-mask: radial-gradient(circle, transparent 46%, #000 47%);
+          mask: radial-gradient(circle, transparent 46%, #000 47%);
+}
+.hc__back-serial {
+  position: absolute;
+  bottom: 9cqw;
+  font-size: 3.4cqw;
+  opacity: .55;
+  font-variant-numeric: tabular-nums;
+}
+.hc__foil--back {
+  mix-blend-mode: color-dodge;
+  opacity: calc(var(--o) * .7);
+  background-image: repeating-linear-gradient(118deg,
+    hsl(350 100% 70%) 0%, hsl(62 100% 64%) 6%, hsl(190 100% 64%) 12%, hsl(290 95% 72%) 18%, hsl(350 100% 70%) 24%);
+  background-size: 300% 300%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hc__tilt { will-change: auto; }
+}
