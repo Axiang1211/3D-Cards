@@ -295,6 +295,7 @@
       refresh();
     });
     const sandColorField = h("div.field", h("span.field__label", HC.t("流沙顏色")), h("div.sand-row", sandSwatches, sandColor));
+    const sandAmountField = slider("sandAmount", HC.t("流沙數量"), { min: 10, max: 80, step: 1, format: pct });
     sandChk.addEventListener("change", () => {
       draft.sand = sandChk.checked;
       syncFoilFields();
@@ -309,7 +310,8 @@
       slider("fgY", HC.t("前景上下"), { min: -50, max: 50, step: 1, format: signed }),
       fgFoilF,
       fgFoilTune,
-      h("label.check", sandChk, h("span", HC.t("流沙：在照片和前景之間流動，佔畫面的一半"))),
+      h("label.check", sandChk, h("span", HC.t("流沙：在照片和前景之間流動"))),
+      sandAmountField,
       sandColorField,
       resetBtn(HC.t("重設前景"), ["fgZoom", "fgX", "fgY", "fgFoil", "fgFoilStrength", "fgFoilHue"])
     );
@@ -323,6 +325,7 @@
       blurF.classList.toggle("is-off", !hasFg);
       blurNote.hidden = hasFg;
       sandColorField.hidden = !draft.sand;
+      sandAmountField.hidden = !draft.sand;
       if (typeof turnBtn !== "undefined") turnBtn.hidden = !(hasFg && draft.sand);
       areaF.disable("frame", draft.frame === "none");
     }

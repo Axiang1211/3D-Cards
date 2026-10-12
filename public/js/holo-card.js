@@ -69,6 +69,7 @@
     // quicksand between the photo and the foreground (needs a foreground)
     sand: false,
     sandColor: "#ffd26e",
+    sandAmount: 50, // % of the picture, 10..80
   };
 
   /** Clamp every numeric field into its valid range. */
@@ -94,6 +95,7 @@
       fgFoilHue: n(c.fgFoilHue, 0, 0, 360),
       sand: c.sand === true || c.sand === "true",
       sandColor: /^#[0-9a-f]{6}$/i.test(c.sandColor || "") ? String(c.sandColor).toLowerCase() : "#ffd26e",
+      sandAmount: n(c.sandAmount, 50, 10, 80),
     };
   };
 
@@ -134,12 +136,15 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   /* ------------------------------------------------------------------ */
-  /* Sand: a falling-sand grid for the quicksand layer.                   */
-  /* Each cell is empty (0) or a grain (1..255 = its shade; >= 248 glints) */
-  /* Gravity can point in any of 8 directions; grains fall, slide down    */
-  /* slopes and level out a little like sand in liquid.                  */
+  /* Sand: a fine falling-sand grid for the quicksand layer.              */
+  /* Each cell is empty (0) or a grain: 1..239 = its shade, 240..255 =    */
+  /* a glinting grain (16 facets that catch the light at different tilts) */
+  /* Gravity can point in any of 8 directions. Grains speed up as they    */
+  /* fall, slide down slopes and level out a little like sand in liquid.  */
+  /* The pile is lit from the top and darker inside.                      */
   /* ------------------------------------------------------------------ */
   const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+  const DEPTH = [1, 2, 4, 7]; // cells looked at above a grain for its shading
 
   class Sand {
     constructor(canvas) {
@@ -147,10 +152,12 @@
       this.ctx = canvas.getContext("2d");
       this.W = this.H = 0;
       this.rgb = [255, 210, 110];
+      this.amount = 0.5;
       this.dir = 2; // index into DIRS: straight down
       this.strength = 1;
       this.quiet = 0;
       this.stamp = 1;
+      this.light = 0;
       this.dirty = true;
     }
     resize(w, h) {
@@ -159,6 +166,7 @@
       this.H = h;
       const n = w * h;
       this.grid = new Uint8Array(n);
+      this.vel = new Uint8Array(n);
       this.moved = new Uint8Array(n);
       this.c.width = w;
       this.c.height = h;
@@ -166,17 +174,30 @@
       this.px = new Uint32Array(this.img.data.buffer);
       this.fill();
     }
-    /** Half of the window, settled on the side gravity points to. */
+    /** Share of the window filled with sand (0.05..0.8). */
+    setAmount(pct) {
+      const a = clamp((+pct || 50) / 100, 0.05, 0.8);
+      if (Math.abs(a - this.amount) < 0.001) return false;
+      this.amount = a;
+      if (this.W) this.fill();
+      return true;
+    }
+    /** Fill the window up to `amount`, settled on the bottom. */
     fill() {
       const { W, H, grid } = this;
       grid.fill(0);
-      let left = Math.floor(W * H * 0.5);
+      this.vel.fill(0);
+      let left = Math.floor(W * H * this.amount);
       let seed = 7;
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
       for (let y = H - 1; y >= 0 && left > 0; y--) {
         for (let x = 0; x < W && left > 0; x++) {
-          const shade = rnd() < 0.035 ? 248 + Math.floor(rnd() * 8) : 1 + Math.floor(rnd() * 240);
-          grid[y * W + x] = shade;
+          const r = rnd();
+          let v;
+          if (r < 0.05) v = 240 + Math.floor(rnd() * 16); // glint
+          else if (r < 0.11) v = 1 + Math.floor(rnd() * 50); // dark speck
+          else v = 1 + Math.floor(((rnd() + rnd() + rnd()) / 3) * 238); // mostly mid tones
+          grid[y * W + x] = v;
           left--;
         }
       }
@@ -186,15 +207,27 @@
     setColor(hex) {
       const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
       const v = m ? parseInt(m[1], 16) : 0xffd26e;
-      this.rgb = [(v >> 16) & 255, (v >> 8) & 255, v & 255];
-      this.dirty = true;
+      const rgb = [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+      if (rgb.join() !== this.rgb.join()) this.dirty = true;
+      this.rgb = rgb;
     }
-    /** gx, gy: gravity in grid space. Returns true while grains still move. */
+    /** dx, dy: where the light is (-1..1). Glints follow it. Returns true if a redraw is due. */
+    setLight(dx, dy) {
+      const l = (Math.round(((((dx * 1.7 + dy * 1.1) * 8) % 16) + 16) * 4) / 4) % 16;
+      if (l === this.light) return false;
+      this.light = l;
+      this.dirty = true;
+      return true;
+    }
+    /** gx, gy: gravity in grid space. */
     setGravity(gx, gy) {
       const m = Math.hypot(gx, gy);
       const dir = ((Math.round(Math.atan2(gy, gx) / (Math.PI / 4)) % 8) + 8) % 8;
       const strength = m < 0.22 ? 0 : Math.min(1, m);
-      if (dir !== this.dir || (strength > 0) !== (this.strength > 0)) this.quiet = 0;
+      if (dir !== this.dir || (strength > 0) !== (this.strength > 0)) {
+        this.quiet = 0;
+        this.dirty = true;
+      }
       this.dir = dir;
       this.strength = strength;
     }
@@ -206,14 +239,15 @@
         this.quiet = 3;
         return false;
       }
-      const { W, H, grid, moved } = this;
+      const { W, H, grid, vel, moved } = this;
       const stamp = (this.stamp = (this.stamp % 250) + 1);
       const [dx, dy] = DIRS[this.dir];
       const diagA = DIRS[(this.dir + 1) % 8];
       const diagB = DIRS[(this.dir + 7) % 8];
       const sideA = DIRS[(this.dir + 2) % 8];
       const sideB = DIRS[(this.dir + 6) % 8];
-      const p = 0.55 + 0.35 * this.strength; // grains in liquid fall a bit lazily
+      const p = 0.6 + 0.35 * this.strength; // grains in liquid start falling a bit lazily
+      const maxV = 1 + Math.round(2 * this.strength); // terminal speed in cells per step
       const flipX = dx === 0 ? stamp & 1 : 0;
       const xs = dx > 0 || (dx === 0 && flipX) ? -1 : 1;
       const ys = dy > 0 ? -1 : 1;
@@ -226,16 +260,24 @@
           const k = y * W + x;
           const v = grid[k];
           if (!v || moved[k] === stamp) continue;
-          if (Math.random() > p) {
-            // resting this frame, but still counts as active if it could fall
-            if (free(x + dx, y + dy)) count++;
-            continue;
-          }
-          let tx = -1, ty = -1;
+          let tx = -1, ty = -1, sp = 0;
           if (free(x + dx, y + dy)) {
+            const cur = vel[k];
+            if (!cur && Math.random() > p) {
+              count++; // about to fall
+              continue;
+            }
+            // Falling: speeds up each step until it lands.
+            sp = Math.min(maxV, cur + 1);
             tx = x + dx;
             ty = y + dy;
+            for (let n = 1; n < sp && free(tx + dx, ty + dy); n++) {
+              tx += dx;
+              ty += dy;
+            }
           } else {
+            vel[k] = 0;
+            if (Math.random() > p) continue;
             const first = Math.random() < 0.5 ? diagA : diagB;
             const second = first === diagA ? diagB : diagA;
             if (free(x + first[0], y + first[1])) {
@@ -244,7 +286,7 @@
             } else if (free(x + second[0], y + second[1])) {
               tx = x + second[0];
               ty = y + second[1];
-            } else if (Math.random() < 0.35) {
+            } else if (Math.random() < 0.3) {
               // Slide sideways only towards a spot it can then fall from: levels the surface, always settles.
               const side = Math.random() < 0.5 ? sideA : sideB;
               const sx = x + side[0], sy = y + side[1];
@@ -257,7 +299,9 @@
           if (tx >= 0) {
             const t = ty * W + tx;
             grid[t] = v;
+            vel[t] = sp;
             grid[k] = 0;
+            vel[k] = 0;
             moved[t] = stamp;
             count++;
           }
@@ -272,27 +316,44 @@
     draw() {
       if (!this.dirty || !this.W) return;
       this.dirty = false;
-      const { grid, px } = this;
+      const { W, H, grid, vel, px, light } = this;
       const [r, g, b] = this.rgb;
-      for (let k = 0; k < grid.length; k++) {
-        const v = grid[k];
-        if (!v) {
-          px[k] = 0;
-          continue;
+      const [ux, uy] = DIRS[(this.dir + 4) % 8]; // "up", against gravity
+      const offs = DEPTH.map((d) => [ux * d, uy * d, (uy * W + ux) * d]);
+      for (let y = 0, k = 0; y < H; y++) {
+        for (let x = 0; x < W; x++, k++) {
+          const v = grid[k];
+          if (!v) {
+            px[k] = 0;
+            continue;
+          }
+          // How much sand lies above this grain: the top is lit, the inside is darker.
+          let cover = 0;
+          for (let i = 0; i < 4; i++) {
+            const o = offs[i];
+            const xx = x + o[0], yy = y + o[1];
+            if (xx >= 0 && yy >= 0 && xx < W && yy < H && grid[k + o[2]]) cover++;
+          }
+          let f;
+          if (v >= 240) {
+            // A facet that faces the light flashes white.
+            let d = Math.abs(v - 240 - light);
+            if (d > 8) d = 16 - d;
+            if (d < 0.75) {
+              px[k] = 0xff000000 | ((255 - ((255 - b) >> 3)) << 16) | ((255 - ((255 - g) >> 3)) << 8) | (255 - ((255 - r) >> 3));
+              continue;
+            }
+            f = 1.08;
+          } else {
+            f = 0.74 + (v / 239) * 0.36;
+          }
+          f *= cover === 0 ? 1.14 : 1.02 - cover * 0.055;
+          const R = Math.min(255, r * f) | 0;
+          const G = Math.min(255, g * f) | 0;
+          const B = Math.min(255, b * f) | 0;
+          const A = vel[k] > 1 ? 200 : 255; // falling grains are a touch see-through
+          px[k] = (A << 24) | (B << 16) | (G << 8) | R;
         }
-        let R, G, B;
-        if (v >= 248) {
-          // glint: mostly white
-          R = 255 - ((255 - r) >> 3);
-          G = 255 - ((255 - g) >> 3);
-          B = 255 - ((255 - b) >> 3);
-        } else {
-          const f = 0.68 + (v / 240) * 0.45;
-          R = Math.min(255, r * f) | 0;
-          G = Math.min(255, g * f) | 0;
-          B = Math.min(255, b * f) | 0;
-        }
-        px[k] = (255 << 24) | (B << 16) | (G << 8) | R;
       }
       this.ctx.putImageData(this.img, 0, 0);
     }
@@ -444,6 +505,7 @@
       if (sandOn) {
         if (!this.sand) this.sand = new Sand(n.sandCanvas);
         this.sand.setColor(v.sandColor);
+        this.sand.setAmount(v.sandAmount);
         if (!this._unRaw && this.opts.gyro) {
           this._unRaw = HC.gyro.subscribeRaw((tx, ty) => {
             this._tiltDeg = [tx, ty];
@@ -654,8 +716,15 @@
         // Not laid out yet; try again for a moment.
         return ++this._sandWait < 120;
       }
-      const cols = 96;
-      this.sand.resize(cols, Math.max(8, Math.round((cols * h) / w)));
+      // Fine grains: about 1.5 CSS pixels each, within a budget of cells.
+      let cols = clamp(Math.round(w / 1.5), 90, 240);
+      let rows = Math.max(8, Math.round((cols * h) / w));
+      if (cols * rows > 80000) {
+        const k = Math.sqrt(80000 / (cols * rows));
+        cols = Math.round(cols * k);
+        rows = Math.round(rows * k);
+      }
+      this.sand.resize(cols, rows);
       const [gx, gy] = this._gravity();
       this.sand.setGravity(gx, gy);
       for (let i = 0; i < Math.min(steps, 2); i++) this.sand.step();
@@ -700,6 +769,8 @@
       const st = this.el.style;
       const dx = (s.mx.value - 50) / 50;
       const dy = (s.my.value - 50) / 50;
+      // Glints in the quicksand follow the light.
+      if (this._sandOn && this.sand && this.sand.W && this.sand.setLight(dx, dy)) this.sand.draw();
       const hyp = clamp(Math.hypot(dx, dy) / Math.SQRT2, 0, 1);
       st.setProperty("--rx", s.rx.value.toFixed(3) + "deg");
       st.setProperty("--ry", s.ry.value.toFixed(3) + "deg");

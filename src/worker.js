@@ -134,6 +134,7 @@ async function createShare(request, env, url) {
     fgFoilHue: num(c.fgFoilHue, 0, 0, 360),
     sand: c.sand === true,
     sandColor: /^#[0-9a-fA-F]{6}$/.test(c.sandColor || "") ? String(c.sandColor).toLowerCase() : "#ffd26e",
+    sandAmount: num(c.sandAmount, 50, 10, 80),
     showText: c.showText !== false,
     image: c.image,
     fg,
