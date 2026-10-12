@@ -31,5 +31,5 @@ window.HC_CONFIG = {
   downloadUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe",
 
   /* The newest Android app (APK) on the Releases page. Leave empty to hide the links. */
-  apkUrl: "", // set to https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk once a signed APK is published
+  apkUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk",
 };
