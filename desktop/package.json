@@ -2,9 +2,10 @@
   "name": "3d-cards-desktop",
   "version": "1.0.0",
   "private": true,
-  "description": "3D Cards 的 Windows 電腦版（Tauri）",
+  "description": "3D Cards 的 Windows 和 Android App（Tauri）",
   "license": "MIT",
   "scripts": {
+    "tauri": "tauri",
     "web": "node copy-web.js",
     "dev": "node copy-web.js && tauri dev",
     "build": "node copy-web.js && tauri build --bundles nsis"
