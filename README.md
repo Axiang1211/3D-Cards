@@ -8,7 +8,7 @@
 
 **線上使用：https://3dcards.app.dreamsworld.top/**
 
-**Windows 電腦版：[下載 3D-Cards-Setup.exe](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe)**
+**Windows App：[下載 3D-Cards-Setup.exe](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe)**　**Android App：[下載 3D-Cards.apk](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk)**　**iPhone / 其他：把網站安裝成 App**（見下方）
 
 不用註冊，打開網頁就能做。介面有中文和 English，在頁面最下方切換。照片只在你的裝置上處理，只有你按下「分享」的卡片才會上傳。
 
@@ -129,26 +129,46 @@
 
 ---
 
-## Windows 電腦版
+## 安裝成 App
 
-不想開瀏覽器，可以安裝電腦版。電腦版和網站的功能一樣，沒有網路也能做卡片（分享連結需要網路）。安裝檔只有幾 MB。
+3D Cards 有三種 App，介面都一樣：深色的卡片庫，電腦上左邊是側邊欄，手機上下方是分頁列。分成「我的卡片」「示範作品」「製作卡片」「設定」；在卡片上按右鍵（手機長按）可以快速打開、分享、匯出、編輯或刪除。
+
+### Windows
 
 1. 下載 [3D-Cards-Setup.exe](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe)，或到這個 GitHub 頁面右側的 **Releases** 下載
 2. 雙擊執行，照著畫面安裝，桌面會出現 3D Cards 的圖示
 
-第一次執行時，Windows 可能會顯示「Windows 已保護您的電腦」。這是因為程式沒有購買數位簽章，按 **其他資訊**，再按 **仍要執行** 就能安裝。
+第一次執行時，Windows 可能會顯示「Windows 已保護您的電腦」。這是因為程式沒有購買數位簽章，按 **其他資訊**，再按 **仍要執行** 就能安裝。電腦版使用 Windows 內建的 Edge 瀏覽器核心（WebView2），少數電腦沒有的話，安裝程式會自動下載。
 
-電腦版使用 Windows 內建的 Edge 瀏覽器核心（WebView2）。Windows 10 和 11 通常已經有了；少數電腦沒有的話，安裝程式會自動下載。
+快速鍵：`Ctrl+N` 製作卡片、`Ctrl+O` 匯入卡片檔、`Ctrl+F` 搜尋、`Ctrl+,` 設定、`Ctrl+S` 儲存卡片；看卡片時 `←` `→` 換卡、空白鍵翻面、`F` 全螢幕、`E` 編輯、`Delete` 刪除、`Esc` 返回。
 
-**更新**：每次打開電腦版，它會到 GitHub 檢查有沒有新版本。有的話會問你要不要更新：
+### Android
 
-- **下載新版**：用瀏覽器下載新的安裝檔，關閉 3D Cards 後執行它，就會換成新版本，做過的卡片都會保留
+1. 用手機下載 [3D-Cards.apk](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk)
+2. 打開下載的檔案。第一次會問要不要允許瀏覽器「安裝不明來源的應用程式」，允許後再按 **安裝**
+3. 主畫面會出現 3D Cards
+
+這個 App 不在 Play 商店上，所以手機可能會提醒「來源不明」，這是正常的。
+
+### 把網站安裝成 App（iPhone、Android、電腦都可以）
+
+- **Android（Chrome）**：打開網站，按右上角 ⋮ →「安裝應用程式」，或網站上方的 **安裝 App**
+- **iPhone / iPad（Safari）**：打開網站，按下方的「分享」→「加入主畫面」
+- **電腦（Chrome / Edge）**：按網址列右邊的「安裝」圖示
+
+安裝後從主畫面或桌面打開，就會是 App 的樣子，沒有網路也能看你的卡片。網站更新時，App 會自動跟著更新。
+
+### 更新
+
+Windows 和 Android App 每次打開都會到 GitHub 檢查有沒有新版本。有的話會問你要不要更新：
+
+- **下載新版**：下載新的安裝檔，安裝後就會換成新版本，做過的卡片都會保留
 - **稍後再說**：繼續使用目前的版本，但不會有新功能
 - 勾選 **這個版本不再提醒**，直到下一個新版本推出前都不會再問
 
-也可以隨時按電腦版頁面最下方的 **檢查更新**。
+也可以隨時在 App 的 **設定** → **檢查更新**。
 
-電腦版的卡片存在電腦版裡，和瀏覽器裡的卡片是分開的。要搬移卡片，用「下載卡片檔」和「匯入卡片檔」。
+每個 App 和瀏覽器的卡片是各自保存的。要在裝置之間搬移，用 **雲端同步**，或「匯出卡片檔」和「匯入卡片檔」。
 
 ---
 
@@ -176,6 +196,7 @@ public/
   index.html             網站唯一的頁面
   css/holo-card.css      卡片的所有視覺效果（鐳射、反光、視差）
   css/style.css          網站版面
+  css/app.css            App 版面（Windows、Android、安裝後的網站）
   js/holo-card.js        卡片元件
   js/motion.js           彈簧物理、陀螺儀
   js/store.js            把卡片存在瀏覽器（IndexedDB）
@@ -193,11 +214,16 @@ public/
   js/sand-core.js        流沙模擬
   js/sand-worker.js      讓流沙在另一個 CPU 核心上跑
   models/u2netp.onnx     自動摳圖模型（U²-Netp，Apache-2.0）
-  js/desktop.js          電腦版專用：外部連結、版本檢查
+  js/desktop.js          App 專用：外部連結、版本檢查
+  js/mode.js             判斷要顯示網站還是 App 版面
+  js/app-shell.js        App 的側邊欄、分頁列和各個頁面
+  js/pwa.js              安裝成 App（PWA）
+  sw.js                  讓安裝後的 App 離線也能打開
+  manifest.webmanifest   App 名稱、圖示
   brand/                 Logo 和網站圖示
   gallery/gallery.js     展廳裡的示範卡片清單
 src/worker.js            分享功能的伺服器（Cloudflare Worker）
-desktop/                 Windows 電腦版（Tauri）
+desktop/                 Windows 和 Android App（Tauri）
 scripts/
   add-card.mjs           把卡片檔加入示範展廳（需要 Node.js）
   make-demo-art.py       重新產生示範卡片的圖（需要 Python）

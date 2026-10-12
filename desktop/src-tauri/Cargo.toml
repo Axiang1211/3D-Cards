@@ -6,12 +6,20 @@ authors = ["Axiang1211"]
 license = "MIT"
 edition = "2021"
 
+[lib]
+# The Android app loads the same code as a library.
+name = "three_d_cards_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+
+# Windows only: one window, even when several .3dcard files are opened.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
 
 # Small, fast release build.

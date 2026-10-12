@@ -148,6 +148,8 @@ body[data-view="detail"] .site-nav__link { color: var(--room-muted); }
 body[data-view="detail"] .site-nav__link:hover { color: var(--room-ink); }
 body[data-view="detail"] .site-nav .btn--ink { background: var(--room-ink); color: var(--room); }
 .site-nav .btn[aria-current] { display: none; }
+.site-nav__install { border: 0; background: none; padding: 0; font: inherit; font-size: 15px; cursor: pointer; }
+.site-nav__install[hidden] { display: none; }
 
 .site-foot {
   display: grid;
@@ -708,6 +710,7 @@ body[data-view="detail"] .toast[data-kind="error"] { background: var(--danger); 
 
 .hero__download { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-top: 10px; font-size: 13px; color: var(--muted); }
 .hero__download a { color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
+.hero__install { border: 0; background: none; padding: 0; font: inherit; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .site-foot__links { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; line-height: 1.4; }
 .site-foot__links > * { flex: none; white-space: nowrap; }
 /* Same layout in every language: text on the left, links on the right, one row. */

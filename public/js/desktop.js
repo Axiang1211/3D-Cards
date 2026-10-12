@@ -52,8 +52,10 @@
     return false;
   }
 
+  const ANDROID = /Android/i.test(navigator.userAgent);
   function setupFor(release) {
-    const asset = (release.assets || []).find((x) => /setup\.exe$/i.test(x.name));
+    const want = ANDROID ? /\.apk$/i : /setup\.exe$/i;
+    const asset = (release.assets || []).find((x) => want.test(x.name));
     return asset ? asset.browser_download_url : RELEASE_PAGE;
   }
 
@@ -83,7 +85,12 @@
       openUrl(setupFor(release)).catch(() => openUrl(RELEASE_PAGE).catch(() => {}));
       body.replaceChildren(
         h("p.share__note", HC.t("新版安裝檔正在你的瀏覽器裡下載。")),
-        h("p.share__note", HC.t("下載完成後，先關閉 3D Cards，再執行 3D-Cards-Setup.exe，就會更新成新版本。你做過的卡片都會保留。")),
+        h(
+          "p.share__note",
+          ANDROID
+            ? HC.t("下載完成後，打開 3D-Cards.apk 安裝，就會更新成新版本。你做過的卡片都會保留。")
+            : HC.t("下載完成後，先關閉 3D Cards，再執行 3D-Cards-Setup.exe，就會更新成新版本。你做過的卡片都會保留。")
+        ),
         h("div.share__actions", h("button.btn.btn--ink", { type: "button", onclick: () => dlg.close() }, HC.t("知道了")))
       );
     });

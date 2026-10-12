@@ -29,4 +29,7 @@ window.HC_CONFIG = {
   googleClientId: "210055593962-3ajro5cogq75030114aqmh737itftgcl.apps.googleusercontent.com",
 
   downloadUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe",
+
+  /* The newest Android app (APK) on the Releases page. Leave empty to hide the links. */
+  apkUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk",
 };

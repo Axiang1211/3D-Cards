@@ -1,11 +1,12 @@
-# Builds the Windows installer (3D-Cards-Setup.exe, a few MB) and publishes it on the Releases page.
+# Builds the Windows installer (3D-Cards-Setup.exe) and the Android app (3D-Cards.apk)
+# and publishes both on the Releases page.
 #
 # How to use (no command line needed):
-#   GitHub → Actions → 「建置 Windows 電腦版」 → Run workflow → enter a version → Run workflow.
+#   GitHub → Actions → 「建置 App（Windows + Android）」 → Run workflow → enter a version → Run workflow.
 # The version must be higher than the previous one (1.0.1 → 1.0.2 → 1.1.0 …).
 # Installed apps compare their version with the newest release on start-up and offer the update.
 
-name: 建置 Windows 電腦版
+name: 建置 App（Windows + Android）
 
 on:
   workflow_dispatch:
@@ -79,6 +80,103 @@ jobs:
           else
             gh release create "$tag" 3D-Cards-Setup.exe \
               --title "3D Cards $VERSION" \
-              --notes "下載 **3D-Cards-Setup.exe** 並執行即可安裝或更新。已安裝的電腦版打開時會提示更新。" \
+              --notes "Windows：下載 **3D-Cards-Setup.exe** 並執行即可安裝或更新。Android：下載 **3D-Cards.apk** 安裝（要允許安裝不明來源的應用程式）。已安裝的 App 打開時會提示更新。" \
               --latest
           fi
+
+  android:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the signing key
+        id: key
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KS" ] || [ -z "$KS_PASS" ]; then
+            echo "::warning::還沒有設定 Android 簽名金鑰（ANDROID_KEYSTORE_B64、ANDROID_KEYSTORE_PASSWORD）。這次的 APK 只用臨時金鑰簽名、不會發布，請看 docs/維護說明.md"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Install
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Build APK
+        working-directory: desktop
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          node copy-web.js
+          npx tauri android init --ci
+          node android-patch.js
+          npx tauri icon src-tauri/icons/icon.png
+          set +e
+          npx tauri android build --apk --ci --target aarch64 armv7 --config "{\"version\":\"$VERSION\"}" 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            { grep -nE "error|Error|FAILED|failed" build.log | tail -n 30; } | sed -e 's/%/%25/g' -e 's/^/::error::/'
+            exit "$status"
+          fi
+          find src-tauri/gen/android/app/build/outputs -name "*.apk" -print
+
+      - name: Sign APK
+        working-directory: desktop
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          apk=$(find src-tauri/gen/android/app/build/outputs/apk -name "*release*.apk" | head -n 1)
+          if [ -n "$KS" ] && [ -n "$KS_PASS" ]; then
+            echo "$KS" | base64 -d > release.jks
+          else
+            export KS_PASS=temporary-test-key
+            keytool -genkeypair -keystore release.jks -alias 3dcards -keyalg RSA -keysize 2048 -validity 30 \
+              -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=3D Cards test build"
+          fi
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
+          "$bt/zipalign" -p -f 4 "$apk" aligned.apk
+          "$bt/apksigner" sign --ks release.jks --ks-key-alias 3dcards --ks-pass env:KS_PASS --key-pass env:KS_PASS --out ../3D-Cards.apk aligned.apk
+          "$bt/apksigner" verify --print-certs ../3D-Cards.apk
+          rm -f release.jks
+          ls -la ../3D-Cards.apk
+
+      - name: Keep the test APK (no signing key yet)
+        if: steps.key.outputs.ok != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3D-Cards-test-apk
+          path: 3D-Cards.apk
+          retention-days: 7
+
+      - name: Publish APK
+        if: steps.key.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: gh release upload "v$VERSION" 3D-Cards.apk --clobber

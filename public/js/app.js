@@ -141,6 +141,7 @@
   /* Router                                                              */
   /* ------------------------------------------------------------------ */
   HC.views = HC.views || {};
+  const APP = !!(window.HC_MODE && window.HC_MODE.app && HC.appViews);
   let current = null;
   let navToken = 0;
 
@@ -150,6 +151,9 @@
     if ((m = hash.match(/^\/card\/([\w-]+)\/?$/))) return { name: "detail", id: m[1] };
     if ((m = hash.match(/^\/create(?:\/([\w-]+))?\/?$/))) return { name: "create", id: m[1] || null };
     if ((m = hash.match(/^\/s\/([A-Za-z0-9]+)\/?$/))) return { name: "shared", id: m[1] };
+    // Pages that only the app has; the website shows its gallery instead.
+    if (APP && /^\/samples\/?$/.test(hash)) return { name: "samples" };
+    if (APP && /^\/settings\/?$/.test(hash)) return { name: "settings" };
     return { name: "gallery" };
   }
 
@@ -161,17 +165,23 @@
     current = null;
     const next = HC.h("div.view.view--" + r.name);
     document.body.dataset.view = r.name === "shared" ? "detail" : r.name;
-    document.querySelectorAll("[data-nav]").forEach((a) => {
-      a.toggleAttribute("aria-current", a.dataset.nav === r.name);
-    });
-    const ctl = await HC.views[r.name](next, r);
+    if (APP) HC.appShellRoute(r.name);
+    else
+      document.querySelectorAll("[data-nav]").forEach((a) => {
+        a.toggleAttribute("aria-current", a.dataset.nav === r.name);
+      });
+    const viewFn = (APP && HC.appViews[r.name]) || HC.views[r.name];
+    const ctl = await viewFn(next, r);
     if (token !== navToken) {
       if (ctl && ctl.destroy) ctl.destroy();
       return;
     }
     view.replaceChildren(next);
     current = ctl;
-    if (!(ctl && ctl.keepScroll)) window.scrollTo(0, 0);
+    if (!(ctl && ctl.keepScroll)) {
+      window.scrollTo(0, 0);
+      view.scrollTop = 0;
+    }
     if (ctl && ctl.title) document.title = ctl.title + " | " + (CONFIG.siteName || "Holo Card");
     else document.title = CONFIG.siteName || "Holo Card";
     if (ctl && ctl.focus) ctl.focus();
@@ -215,6 +225,18 @@
       const upd = HC.h("button.site-foot__link.site-foot__btn", { type: "button", onclick: () => D.checkForUpdates() }, HC.t("檢查更新"));
       links.prepend(ver, upd);
       D.version().then((v) => (ver.textContent = HC.t("電腦版 {v}", { v }))).catch(() => {});
+    }
+    // Website: offer to install it as an app (PWA).
+    if (!APP && HC.pwa && HC.pwa.offer) {
+      const nav = document.querySelector(".site-nav");
+      const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const inst = HC.h("button.site-nav__link.site-nav__install", { type: "button", onclick: () => HC.pwa.install() }, HC.t("安裝 App"));
+      const sync = () => (inst.hidden = !(HC.pwa.promptReady || mobile));
+      HC.pwa.onChange(sync);
+      sync();
+      if (nav) nav.insertBefore(inst, nav.querySelector(".btn"));
+      const fl = document.querySelector(".site-foot__links");
+      if (fl) fl.insertBefore(HC.h("button.site-foot__link.site-foot__btn", { type: "button", onclick: () => HC.pwa.install() }, HC.t("安裝成 App")), fl.querySelector("#repo-link"));
     }
     const dl = document.getElementById("download-link");
     if (dl && CONFIG.downloadUrl && !window.HC_DESKTOP) {

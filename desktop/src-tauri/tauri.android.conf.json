@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "top.dreamsworld.cards3d",
+  "bundle": {
+    "android": {
+      "minSdkVersion": 24
+    }
+  }
+}

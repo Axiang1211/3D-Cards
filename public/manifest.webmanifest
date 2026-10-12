@@ -1,0 +1,35 @@
+{
+  "id": "/",
+  "name": "3D Cards",
+  "short_name": "3D Cards",
+  "description": "把照片做成會反光的 3D 鐳射卡片。Turn photos into holographic 3D cards.",
+  "lang": "zh-Hant-TW",
+  "start_url": "/#/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#111216",
+  "theme_color": "#111216",
+  "categories": ["photo", "graphics", "entertainment"],
+  "icons": [
+    { "src": "brand/logo-mark-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "brand/logo-mark-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "brand/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "製作卡片",
+      "short_name": "製作",
+      "url": "/#/create",
+      "icons": [{ "src": "brand/logo-mark-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/#/",
+      "accept": { "application/x-3dcard": [".3dcard"] },
+      "launch_type": "single-client"
+    }
+  ]
+}
