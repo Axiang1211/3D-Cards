@@ -631,7 +631,7 @@
         this.sand.setColor(v.sandColor);
         this.sand.setAmount(v.sandAmount);
         this._sandGrain = v.sandGrain;
-        if (!this._unRaw && this.opts.gyro) {
+        if (!this._unRaw && (this.opts.gyro || this.opts.worldGravity)) {
           this._unRaw = HC.gyro.subscribeRaw((tx, ty) => {
             this._tiltDeg = [tx, ty];
             this._wakeSand();
@@ -825,14 +825,28 @@
 
     _gravity() {
       // Gravity on screen: from the phone's tilt, or straight down.
-      let gx = 0, gy = 1;
-      if (this._tiltDeg && HC.gyro.receiving && this.opts.gyro) {
+      const useTilt = this._tiltDeg && HC.gyro.receiving && (this.opts.gyro || this.opts.worldGravity);
+      let gx = 0, gy = 1, gz = 0;
+      if (useTilt) {
         gx = Math.sin((this._tiltDeg[0] * Math.PI) / 180);
         gy = Math.sin((this._tiltDeg[1] * Math.PI) / 180);
+        gz = -Math.sqrt(Math.max(0, 1 - gx * gx - gy * gy)); // the rest points into the screen
       }
-      // Into the card's own coordinates (the card may be turned upside down).
-      const a = (-this.s.rot.value * Math.PI) / 180;
-      return [gx * Math.cos(a) - gy * Math.sin(a), gx * Math.sin(a) + gy * Math.cos(a)];
+      const R = Math.PI / 180;
+      const rotZ = (v, a) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a), v[2]];
+      const rotY = (v, a) => [v[0] * Math.cos(a) + v[2] * Math.sin(a), v[1], -v[0] * Math.sin(a) + v[2] * Math.cos(a)];
+      const rotX = (v, a) => [v[0], v[1] * Math.cos(a) - v[2] * Math.sin(a), v[1] * Math.sin(a) + v[2] * Math.cos(a)];
+      let g = [gx, gy, gz];
+      if (this.opts.worldGravity) {
+        // The card can be turned any way (full screen): undo rotateX, then rotateY, as in the CSS.
+        g = rotX(g, -this.s.rx.value * R);
+        g = rotY(g, -this.s.ry.value * R);
+      }
+      // Into the card's own coordinates (it may be upside down, or showing its back).
+      g = rotZ(g, -this.s.rot.value * R);
+      g = rotY(g, -this.s.flip.value * R);
+      // Only the part along the card's face moves the sand; lying flat, it rests.
+      return [g[0], g[1]];
     }
 
     _sandTick(steps) {

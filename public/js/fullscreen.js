@@ -1,8 +1,8 @@
 /*
  * fullscreen.js
  * Full-screen viewer: one card on a dark stage.
- *   drag            rotate freely, all the way round, either way (with inertia,
- *                   settles on the front or back)
+ *   drag            rotate freely, all the way round, either way; it glides
+ *                   a little and stays at whatever angle it stops
  *   360° button / R spin like a turntable
  *   mouse / phone   tilt a little on top, with the same 2.5D depth as the card page
  *   double-click    flip
@@ -18,7 +18,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   HC.openFullscreen = function (data) {
-    const card = new HC.HoloCard(data, { interactive: false, gyro: false, maxTilt: 0 });
+    const card = new HC.HoloCard(data, { interactive: false, gyro: false, maxTilt: 0, worldGravity: true });
     const stage = h("div.fs__card", card.el);
     const close = h("button.fs__close", { type: "button", "aria-label": HC.t("關閉全螢幕") }, "×");
     const hint = h(
@@ -52,7 +52,10 @@
     let rotY = -18, rotX = 6, velY = 0, velX = 0;
     let targetY = 0, targetX = 0, zoom = 1, targetZoom = 1;
     let hx = 0, hy = 0, thx = 0, thy = 0;
-    let dragging = false, settling = false, spinning = false, alive = true;
+    let lastRy = 1e9, lastRx = 1e9;
+    // "settling" is only used for animations we start ourselves (the intro and a flip);
+    // after a drag the card simply stays at whatever angle it ends up.
+    let dragging = false, settling = true, spinning = false, alive = true;
     let last = null;
     const pointers = new Map();
     let pinchStart = 0, pinchZoom = 1;
@@ -64,6 +67,12 @@
       const rx = rotX - hy * TILT;
       s.ry.jump(ry);
       s.rx.jump(rx);
+      // Quicksand pours towards the bottom of the screen, whichever way the card is turned.
+      if (Math.abs(ry - lastRy) + Math.abs(rx - lastRx) > 0.3) {
+        lastRy = ry;
+        lastRx = rx;
+        card._wakeSand();
+      }
       // Light, foil and the 2.5D depth follow the angle the card is turned to.
       const ay = (ry * Math.PI) / 180;
       const ax = (rx * Math.PI) / 180;
@@ -78,7 +87,6 @@
       stage.style.transform = `scale(${zoom.toFixed(4)})`;
     }
 
-    const near = (v, step) => Math.round(v / step) * step;
 
     // Time-based, so slow screens spin and settle at the same speed.
     let prev = performance.now();
@@ -90,25 +98,26 @@
       prev = now;
       if (!dragging) {
         if (spinning) {
-          // Turntable: keep going round, level out the up/down angle.
+          // Turntable: keep going round at the current up/down angle.
           velY += ((velY < 0 ? -SPIN : SPIN) - velY) * ease(0.04, k);
           velX *= Math.pow(0.9, k);
           rotY += velY * k;
           rotX += velX * k;
-          rotX += (near(rotX, 360) - rotX) * ease(0.04, k);
         } else if (!settling) {
           rotY += velY * k;
           rotX += velX * k;
           velY *= Math.pow(0.94, k);
           velX *= Math.pow(0.94, k);
-          if (Math.abs(velY) < 0.08 && Math.abs(velX) < 0.08) {
-            settling = true;
-            targetY = near(rotY, 180);
-            targetX = near(rotX, 360);
-          }
+          if (Math.abs(velY) < 0.01) velY = 0;
+          if (Math.abs(velX) < 0.01) velX = 0;
         } else {
           rotY += (targetY - rotY) * ease(0.08, k);
-          rotX += (targetX - rotX) * ease(0.06, k);
+          rotX += (targetX - rotX) * ease(0.08, k);
+          if (Math.abs(targetY - rotY) < 0.05 && Math.abs(targetX - rotX) < 0.05) {
+            rotY = targetY;
+            rotX = targetX;
+            settling = false;
+          }
         }
       }
       hx += (thx - hx) * ease(0.12, k);
@@ -126,7 +135,7 @@
         settling = false;
         if (Math.abs(velY) < 0.2) velY = SPIN * 0.2;
       } else {
-        settling = false; // coast to a stop, then settle on a face
+        settling = false; // coast to a stop wherever it is
       }
     }
     spinBtn.addEventListener("click", () => setSpin(!spinning));
@@ -217,8 +226,10 @@
       if (spinning) setSpin(false);
       settling = true;
       velY = velX = 0;
-      targetY = (Math.round(rotY / 180) + 1) * 180;
-      targetX = near(rotX, 360);
+      // Half a turn on from wherever the card is, always the same way round.
+      const upright = Math.cos((rotX * Math.PI) / 180) >= 0 ? 1 : -1;
+      targetY = rotY + 180 * upright;
+      targetX = rotX;
     }
 
     /* Keyboard -------------------------------------------------------- */
