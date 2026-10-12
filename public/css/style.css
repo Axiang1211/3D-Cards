@@ -821,7 +821,7 @@ body[data-view="detail"] .lang-switch button[aria-pressed="true"] { background: 
   position: relative;
   width: min(86vw, calc(86vh * 63 / 88), 640px);
   transform-origin: 50% 50%;
-  will-change: transform;
+  /* No will-change here: in Chrome it hides the foreground's drop-shadow layer (the 3D pop). */
 }
 .fs__card .hc__shadow { background: rgba(0, 0, 0, .75); }
 .fs__close {

@@ -296,6 +296,7 @@
     });
     const sandColorField = h("div.field", h("span.field__label", HC.t("流沙顏色")), h("div.sand-row", sandSwatches, sandColor));
     const sandAmountField = slider("sandAmount", HC.t("流沙數量"), { min: 10, max: 80, step: 1, format: pct });
+    const sandGrainField = slider("sandGrain", HC.t("顆粒大小"), { min: 1, max: 4, step: 0.5, format: (v) => v.toFixed(1) + " px" });
     sandChk.addEventListener("change", () => {
       draft.sand = sandChk.checked;
       syncFoilFields();
@@ -312,6 +313,7 @@
       fgFoilTune,
       h("label.check", sandChk, h("span", HC.t("流沙：在照片和前景之間流動"))),
       sandAmountField,
+      sandGrainField,
       sandColorField,
       resetBtn(HC.t("重設前景"), ["fgZoom", "fgX", "fgY", "fgFoil", "fgFoilStrength", "fgFoilHue"])
     );
@@ -326,6 +328,7 @@
       blurNote.hidden = hasFg;
       sandColorField.hidden = !draft.sand;
       sandAmountField.hidden = !draft.sand;
+      sandGrainField.hidden = !draft.sand;
       if (typeof turnBtn !== "undefined") turnBtn.hidden = !(hasFg && draft.sand);
       areaF.disable("frame", draft.frame === "none");
     }

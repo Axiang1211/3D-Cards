@@ -1,7 +1,10 @@
 /*
  * fullscreen.js
  * Full-screen viewer: one card on a dark stage.
- *   drag            rotate freely (with inertia, settles on the front or back)
+ *   drag            rotate freely, all the way round, either way (with inertia,
+ *                   settles on the front or back)
+ *   360° button / R spin like a turntable
+ *   mouse / phone   tilt a little on top, with the same 2.5D depth as the card page
  *   double-click    flip
  *   wheel / pinch   zoom
  *   Esc / ×         close
@@ -20,10 +23,11 @@
     const close = h("button.fs__close", { type: "button", "aria-label": HC.t("關閉全螢幕") }, "×");
     const hint = h(
       "p.fs__hint",
-      h("span.hint-desk", HC.t("拖曳旋轉 · 雙擊翻面 · 滾輪縮放")),
-      h("span.hint-touch", HC.t("拖曳旋轉 · 點兩下翻面 · 雙指縮放"))
+      h("span.hint-desk", HC.t("拖曳 360° 旋轉 · 雙擊翻面 · 滾輪縮放")),
+      h("span.hint-touch", HC.t("拖曳 360° 旋轉 · 點兩下翻面 · 雙指縮放"))
     );
-    const tools = h("div.fs__tools");
+    const spinBtn = h("button.btn.btn--light.btn--sm", { type: "button", "aria-pressed": "false" }, HC.t("360° 自動旋轉"));
+    const tools = h("div.fs__tools", spinBtn);
     if (data.sand && data.fg) {
       tools.appendChild(h("button.btn.btn--light.btn--sm", { type: "button", onclick: () => card.turn() }, HC.t("上下顛倒")));
     }
@@ -40,9 +44,15 @@
     document.documentElement.classList.add("is-fs");
 
     /* State ------------------------------------------------------------ */
+    // rotY / rotX: where the card has been turned to (any angle, all the way round).
+    // hx / hy: the extra tilt that follows the mouse or the phone, like on the card page.
+    const TILT = 14; // degrees, same as the card page
+    const SPIN = 0.75; // degrees per frame while spinning (about 45°/s)
+    const DEPTH = 1 / Math.sin((TILT * Math.PI) / 180); // full parallax at the card page's tilt
     let rotY = -18, rotX = 6, velY = 0, velX = 0;
-    let targetY = 0, zoom = 1, targetZoom = 1;
-    let dragging = false, settling = false, alive = true;
+    let targetY = 0, targetX = 0, zoom = 1, targetZoom = 1;
+    let hx = 0, hy = 0, thx = 0, thy = 0;
+    let dragging = false, settling = false, spinning = false, alive = true;
     let last = null;
     const pointers = new Map();
     let pinchStart = 0, pinchZoom = 1;
@@ -50,46 +60,101 @@
 
     function write() {
       const s = card.s;
-      s.ry.jump(rotY);
-      s.rx.jump(rotX);
-      // Light and foil follow the angle the card is turned to.
-      const ay = (rotY * Math.PI) / 180;
-      const ax = (rotX * Math.PI) / 180;
-      const facing = Math.cos(ay) >= 0 ? 1 : -1; // mirror the light on the back
-      s.mx.jump(50 + Math.sin(ay) * 55 * facing);
-      s.my.jump(50 - Math.sin(ax) * 70);
-      s.o.jump(0.45 + 0.55 * Math.min(1, Math.abs(Math.sin(ay)) * 1.6 + Math.abs(Math.sin(ax))));
+      const ry = rotY + hx * TILT;
+      const rx = rotX - hy * TILT;
+      s.ry.jump(ry);
+      s.rx.jump(rx);
+      // Light, foil and the 2.5D depth follow the angle the card is turned to.
+      const ay = (ry * Math.PI) / 180;
+      const ax = (rx * Math.PI) / 180;
+      const facing = Math.cos(ay) * Math.cos(ax) >= 0 ? 1 : -1; // mirrored on the back
+      const dx = clamp(Math.sin(ay) * DEPTH, -1, 1) * facing;
+      const dy = clamp(-Math.sin(ax) * DEPTH, -1, 1);
+      s.mx.jump(50 + dx * 50);
+      s.my.jump(50 + dy * 50);
+      s.o.jump(0.45 + 0.55 * Math.min(1, Math.hypot(dx, dy)));
+      s.lift.jump(1 + 0.035 * Math.min(1, Math.hypot(hx, hy) * 2));
       card._write();
       stage.style.transform = `scale(${zoom.toFixed(4)})`;
     }
 
-    function frame() {
+    const near = (v, step) => Math.round(v / step) * step;
+
+    // Time-based, so slow screens spin and settle at the same speed.
+    let prev = performance.now();
+    const ease = (a, k) => 1 - Math.pow(1 - a, k);
+
+    function frame(now) {
       if (!alive) return;
+      const k = Math.min(4, Math.max(0.25, (now - prev) / 16.667 || 1));
+      prev = now;
       if (!dragging) {
-        if (!settling) {
-          rotY += velY;
-          rotX += velX;
-          velY *= 0.94;
-          velX *= 0.9;
+        if (spinning) {
+          // Turntable: keep going round, level out the up/down angle.
+          velY += ((velY < 0 ? -SPIN : SPIN) - velY) * ease(0.04, k);
+          velX *= Math.pow(0.9, k);
+          rotY += velY * k;
+          rotX += velX * k;
+          rotX += (near(rotX, 360) - rotX) * ease(0.04, k);
+        } else if (!settling) {
+          rotY += velY * k;
+          rotX += velX * k;
+          velY *= Math.pow(0.94, k);
+          velX *= Math.pow(0.94, k);
           if (Math.abs(velY) < 0.08 && Math.abs(velX) < 0.08) {
             settling = true;
-            targetY = Math.round(rotY / 180) * 180;
+            targetY = near(rotY, 180);
+            targetX = near(rotX, 360);
           }
         } else {
-          rotY += (targetY - rotY) * 0.08;
+          rotY += (targetY - rotY) * ease(0.08, k);
+          rotX += (targetX - rotX) * ease(0.06, k);
         }
-        rotX += (0 - rotX) * 0.05;
       }
-      zoom += (targetZoom - zoom) * 0.2;
+      hx += (thx - hx) * ease(0.12, k);
+      hy += (thy - hy) * ease(0.12, k);
+      zoom += (targetZoom - zoom) * ease(0.2, k);
       write();
       requestAnimationFrame(frame);
     }
 
-    /* Pointer: rotate, pinch, double-tap -------------------------------- */
+    function setSpin(on) {
+      spinning = on;
+      spinBtn.setAttribute("aria-pressed", String(on));
+      spinBtn.textContent = on ? HC.t("停止旋轉") : HC.t("360° 自動旋轉");
+      if (on) {
+        settling = false;
+        if (Math.abs(velY) < 0.2) velY = SPIN * 0.2;
+      } else {
+        settling = false; // coast to a stop, then settle on a face
+      }
+    }
+    spinBtn.addEventListener("click", () => setSpin(!spinning));
+
+    /* Hover / phone tilt on top of the turn ---------------------------- */
+    root.addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "mouse" || dragging || pointers.size) return;
+      const r = stage.getBoundingClientRect();
+      thx = clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2), -1, 1);
+      thy = clamp((e.clientY - (r.top + r.height / 2)) / (r.height / 2), -1, 1);
+    });
+    root.addEventListener("pointerleave", () => {
+      thx = thy = 0;
+    });
+    const unGyro = HC.gyro
+      ? HC.gyro.subscribe((x, y) => {
+          if (!HC.gyro.receiving || dragging || pointers.size) return;
+          thx = clamp(x, -1, 1);
+          thy = clamp(y, -1, 1);
+        })
+      : null;
+
+    /* Pointer: rotate any way, pinch, double-tap ------------------------ */
     root.addEventListener("pointerdown", (e) => {
       if (e.target.closest("button")) return;
       root.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      thx = thy = 0;
       if (pointers.size === 2) {
         const [a, b] = [...pointers.values()];
         pinchStart = Math.hypot(a.x - b.x, a.y - b.y);
@@ -120,10 +185,12 @@
       if (!dragging || !last) return;
       const dx = e.clientX - last.x;
       const dy = e.clientY - last.y;
-      rotY += dx * 0.45;
-      rotX = clamp(rotX - dy * 0.3, -40, 40);
-      velY = dx * 0.45;
-      velX = -dy * 0.3;
+      // Upside down, left/right drags turn the other way so the card still follows the hand.
+      const upright = Math.cos((rotX * Math.PI) / 180) >= 0 ? 1 : -1;
+      rotY += dx * 0.45 * upright;
+      rotX -= dy * 0.45;
+      velY = dx * 0.45 * upright;
+      velX = -dy * 0.45;
       last = { x: e.clientX, y: e.clientY, t: performance.now() };
     });
     const up = (e) => {
@@ -147,9 +214,11 @@
     );
 
     function flip() {
+      if (spinning) setSpin(false);
       settling = true;
       velY = velX = 0;
       targetY = (Math.round(rotY / 180) + 1) * 180;
+      targetX = near(rotX, 360);
     }
 
     /* Keyboard -------------------------------------------------------- */
@@ -163,6 +232,12 @@
         settling = false;
         velY = e.key === "ArrowLeft" ? -6 : 6;
       }
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        settling = false;
+        velX = e.key === "ArrowUp" ? 6 : -6;
+      }
+      if (e.key === "r" || e.key === "R") setSpin(!spinning);
       if (e.key === "+" || e.key === "=") targetZoom = clamp(targetZoom * 1.15, 0.6, 2.4);
       if (e.key === "-") targetZoom = clamp(targetZoom / 1.15, 0.6, 2.4);
     }
@@ -187,6 +262,7 @@
     function exit() {
       if (!alive) return;
       alive = false;
+      if (unGyro) unGyro();
       document.removeEventListener("keydown", onKey, true);
       document.removeEventListener("fullscreenchange", onFsChange);
       document.removeEventListener("webkitfullscreenchange", onFsChange);

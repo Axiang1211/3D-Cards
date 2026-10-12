@@ -70,6 +70,7 @@
     sand: false,
     sandColor: "#ffd26e",
     sandAmount: 50, // % of the picture, 10..80
+    sandGrain: 1.5, // grain size in CSS pixels, 1..4
   };
 
   /** Clamp every numeric field into its valid range. */
@@ -96,6 +97,7 @@
       sand: c.sand === true || c.sand === "true",
       sandColor: /^#[0-9a-f]{6}$/i.test(c.sandColor || "") ? String(c.sandColor).toLowerCase() : "#ffd26e",
       sandAmount: n(c.sandAmount, 50, 10, 80),
+      sandGrain: n(c.sandGrain, 1.5, 1, 4),
     };
   };
 
@@ -134,13 +136,22 @@
   }
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  /** Another half turn in the same direction; 360° is the same as 0°, so keep the numbers small. */
+  const onward = (spring) => {
+    if (spring.target >= 360) {
+      spring.value -= 360;
+      spring.target -= 360;
+    }
+    spring.set(spring.target + 180);
+  };
 
   /* ------------------------------------------------------------------ */
   /* Sand: a fine falling-sand grid for the quicksand layer.              */
   /* Each cell is empty (0) or a grain: 1..239 = its shade, 240..255 =    */
   /* a glinting grain (16 facets that catch the light at different tilts) */
-  /* Gravity can point in any of 8 directions. Grains speed up as they    */
-  /* fall, slide down slopes and level out a little like sand in liquid.  */
+  /* The sand sits in a clear, oily liquid: grains have their own speed,  */
+  /* sink slowly towards gravity (any direction), keep drifting for a     */
+  /* moment when the card turns, and pile up with gentle slopes.          */
   /* The pile is lit from the top and darker inside.                      */
   /* ------------------------------------------------------------------ */
   const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
@@ -166,7 +177,10 @@
       this.H = h;
       const n = w * h;
       this.grid = new Uint8Array(n);
-      this.vel = new Uint8Array(n);
+      this.vx = new Float32Array(n); // speed, cells per step
+      this.vy = new Float32Array(n);
+      this.fx = new Float32Array(n); // how far into the next cell
+      this.fy = new Float32Array(n);
       this.moved = new Uint8Array(n);
       this.c.width = w;
       this.c.height = h;
@@ -186,7 +200,10 @@
     fill() {
       const { W, H, grid } = this;
       grid.fill(0);
-      this.vel.fill(0);
+      this.vx.fill(0);
+      this.vy.fill(0);
+      this.fx.fill(0);
+      this.fy.fill(0);
       let left = Math.floor(W * H * this.amount);
       let seed = 7;
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -224,12 +241,16 @@
       const m = Math.hypot(gx, gy);
       const dir = ((Math.round(Math.atan2(gy, gx) / (Math.PI / 4)) % 8) + 8) % 8;
       const strength = m < 0.22 ? 0 : Math.min(1, m);
-      if (dir !== this.dir || (strength > 0) !== (this.strength > 0)) {
+      const ux = m ? gx / m : 0, uy = m ? gy / m : 1;
+      // Any real change of direction wakes the sand up again.
+      if (dir !== this.dir || (strength > 0) !== (this.strength > 0) || Math.abs(ux - (this.ux || 0)) + Math.abs(uy - (this.uy || 0)) > 0.03) {
         this.quiet = 0;
-        this.dirty = true;
+        if (dir !== this.dir) this.dirty = true;
       }
       this.dir = dir;
       this.strength = strength;
+      this.ux = ux;
+      this.uy = uy;
     }
     get asleep() {
       return this.quiet > 2;
@@ -239,15 +260,19 @@
         this.quiet = 3;
         return false;
       }
-      const { W, H, grid, vel, moved } = this;
+      const { W, H, grid, vx, vy, fx, fy, moved } = this;
       const stamp = (this.stamp = (this.stamp % 250) + 1);
       const [dx, dy] = DIRS[this.dir];
       const diagA = DIRS[(this.dir + 1) % 8];
       const diagB = DIRS[(this.dir + 7) % 8];
       const sideA = DIRS[(this.dir + 2) % 8];
       const sideB = DIRS[(this.dir + 6) % 8];
-      const p = 0.6 + 0.35 * this.strength; // grains in liquid start falling a bit lazily
-      const maxV = 1 + Math.round(2 * this.strength); // terminal speed in cells per step
+      // Oil: a slow pull, strong drag (top speed ACC / (1 - DRAG) ≈ 0.4 cells per step),
+      // but enough memory that moving sand keeps drifting for a moment when the card turns.
+      const ACC = 0.016 * this.strength;
+      const DRAG = 0.96;
+      const ax = this.ux * ACC, ay = this.uy * ACC;
+      const px = -this.uy, py = this.ux; // across gravity, for a little wobble while sinking
       const flipX = dx === 0 ? stamp & 1 : 0;
       const xs = dx > 0 || (dx === 0 && flipX) ? -1 : 1;
       const ys = dy > 0 ? -1 : 1;
@@ -260,50 +285,126 @@
           const k = y * W + x;
           const v = grid[k];
           if (!v || moved[k] === stamp) continue;
-          let tx = -1, ty = -1, sp = 0;
+          // Bigger grains (by their shade) sink a little faster, so falling sand spreads out.
+          const g = 0.75 + ((v * 37) % 50) / 100;
+          let svx = vx[k] * DRAG + ax * g;
+          let svy = vy[k] * DRAG + ay * g;
+          let sfx = fx[k], sfy = fy[k];
+          let cx = x, cy = y;
           if (free(x + dx, y + dy)) {
-            const cur = vel[k];
-            if (!cur && Math.random() > p) {
-              count++; // about to fall
-              continue;
-            }
-            // Falling: speeds up each step until it lands.
-            sp = Math.min(maxV, cur + 1);
-            tx = x + dx;
-            ty = y + dy;
-            for (let n = 1; n < sp && free(tx + dx, ty + dy); n++) {
-              tx += dx;
-              ty += dy;
-            }
-          } else {
-            vel[k] = 0;
-            if (Math.random() > p) continue;
-            const first = Math.random() < 0.5 ? diagA : diagB;
-            const second = first === diagA ? diagB : diagA;
-            if (free(x + first[0], y + first[1])) {
-              tx = x + first[0];
-              ty = y + first[1];
-            } else if (free(x + second[0], y + second[1])) {
-              tx = x + second[0];
-              ty = y + second[1];
-            } else if (Math.random() < 0.3) {
-              // Slide sideways only towards a spot it can then fall from: levels the surface, always settles.
-              const side = Math.random() < 0.5 ? sideA : sideB;
-              const sx = x + side[0], sy = y + side[1];
-              if (free(sx, sy) && free(sx + dx, sy + dy)) {
-                tx = sx;
-                ty = sy;
-              }
+            // Sinking through the liquid: a slight sideways wobble.
+            const w = (Math.random() - 0.5) * 0.012;
+            const u = (Math.random() - 0.5) * 0.012; // and uneven sinking, so layers break up
+            svx += px * w + this.ux * u;
+            svy += py * w + this.uy * u;
+          }
+          // Pressed against an edge: no speed builds up that way. Pressed against a grain: go no
+          // faster than it does, so sand moves along together instead of one grain at a time.
+          if (svx !== 0) {
+            const sn = svx > 0 ? 1 : -1, xx = x + sn;
+            if (xx < 0 || xx >= W) svx = sfx = 0;
+            else if (grid[k + sn]) {
+              const nv = vx[k + sn];
+              if (nv * sn > 0) {
+                if (svx * sn > nv * sn) svx = nv;
+                if (sfx * sn > fx[k + sn] * sn) sfx = fx[k + sn];
+              } else svx = sfx = 0;
             }
           }
-          if (tx >= 0) {
-            const t = ty * W + tx;
+          if (svy !== 0) {
+            const sn = svy > 0 ? 1 : -1, yy = y + sn, t = k + sn * W;
+            if (yy < 0 || yy >= H) svy = sfy = 0;
+            else if (grid[t]) {
+              const nv = vy[t];
+              if (nv * sn > 0) {
+                if (svy * sn > nv * sn) svy = nv;
+                if (sfy * sn > fy[t] * sn) sfy = fy[t];
+              } else svy = sfy = 0;
+            }
+          }
+          sfx += svx;
+          sfy += svy;
+          for (let guard = 0; guard < 3 && (sfx >= 1 || sfx <= -1 || sfy >= 1 || sfy <= -1); guard++) {
+            const sx = sfx >= 1 ? 1 : sfx <= -1 ? -1 : 0;
+            const sy = sfy >= 1 ? 1 : sfy <= -1 ? -1 : 0;
+            if (free(cx + sx, cy + sy)) {
+              cx += sx;
+              cy += sy;
+              sfx -= sx;
+              sfy -= sy;
+            } else if (sx && sy && free(cx + sx, cy)) {
+              cx += sx;
+              sfx -= sx;
+              sfy = 0;
+              svy *= 0.4;
+            } else if (sx && sy && free(cx, cy + sy)) {
+              cy += sy;
+              sfy -= sy;
+              sfx = 0;
+              svx *= 0.4;
+            } else {
+              // Ran into sand or the edge: the speed in that direction is soaked up.
+              if (sx) {
+                sfx = 0;
+                svx = 0;
+              }
+              if (sy) {
+                sfy = 0;
+                svy = 0;
+              }
+              break;
+            }
+          }
+          if (cx === x && cy === y && !free(x + dx, y + dy)) {
+            // Resting on sand: slide gently down slopes (slower than in air).
+            // Only moves that go downhill for the real (not rounded) gravity, so the pile always settles.
+            let tx = -1, ty = -1;
+            const first = Math.random() < 0.5 ? diagA : diagB;
+            const second = first === diagA ? diagB : diagA;
+            const ok = (d) => d[0] * this.ux + d[1] * this.uy > 0.02;
+            if (ok(first) && free(x + first[0], y + first[1])) {
+              tx = x + first[0];
+              ty = y + first[1];
+            } else if (ok(second) && free(x + second[0], y + second[1])) {
+              tx = x + second[0];
+              ty = y + second[1];
+            } else {
+              // Levelling: roll along the surface when the grain can then sink straight down.
+              const side = Math.random() < 0.5 ? sideA : sideB;
+              const up = side[0] * this.ux + side[1] * this.uy;
+              const sx = x + side[0], sy = y + side[1];
+              const then = (d) => d[0] * this.ux + d[1] * this.uy + up > 0.1 && free(sx + d[0], sy + d[1]);
+              if (up > -0.1 && free(sx, sy) && then(DIRS[this.dir])) {
+                if (Math.random() < 0.25) {
+                  tx = x + side[0];
+                  ty = y + side[1];
+                } else count++; // will level out a little later
+              }
+            }
+            if (tx >= 0) {
+              if (Math.random() < 0.5) {
+                cx = tx;
+                cy = ty;
+              } else count++; // slope still settling
+            }
+          }
+          if (cx !== x || cy !== y) {
+            const t = cy * W + cx;
             grid[t] = v;
-            vel[t] = sp;
             grid[k] = 0;
-            vel[k] = 0;
+            vx[t] = svx;
+            vy[t] = svy;
+            fx[t] = sfx;
+            fy[t] = sfy;
+            vx[k] = vy[k] = fx[k] = fy[k] = 0;
             moved[t] = stamp;
             count++;
+          } else {
+            vx[k] = svx;
+            vy[k] = svy;
+            fx[k] = sfx;
+            fy[k] = sfy;
+            if (svx * svx + svy * svy > 0.0004) count++; // still drifting inside the cell
           }
         }
       }
@@ -316,7 +417,7 @@
     draw() {
       if (!this.dirty || !this.W) return;
       this.dirty = false;
-      const { W, H, grid, vel, px, light } = this;
+      const { W, H, grid, vx, vy, px, light } = this;
       const [r, g, b] = this.rgb;
       const [ux, uy] = DIRS[(this.dir + 4) % 8]; // "up", against gravity
       const offs = DEPTH.map((d) => [ux * d, uy * d, (uy * W + ux) * d]);
@@ -351,7 +452,7 @@
           const R = Math.min(255, r * f) | 0;
           const G = Math.min(255, g * f) | 0;
           const B = Math.min(255, b * f) | 0;
-          const A = vel[k] > 1 ? 200 : 255; // falling grains are a touch see-through
+          const A = vx[k] * vx[k] + vy[k] * vy[k] > 0.04 ? 215 : 255; // sinking grains are a touch see-through
           px[k] = (A << 24) | (B << 16) | (G << 8) | R;
         }
       }
@@ -379,6 +480,7 @@
       );
       this.data = Object.assign({}, HC.DEFAULTS, data);
       this.flipped = false;
+      this.turned = false;
       this.pointerActive = false;
       this.keyTilt = { x: 0, y: 0 };
       this._t0 = performance.now();
@@ -454,6 +556,14 @@
       el("div", "hc__glare", back);
 
       fg.addEventListener("error", () => (fg.hidden = true));
+      // Chrome sometimes keeps showing an empty layer when a picture finishes loading inside a
+      // 3D-turned card (seen in the full-screen viewer). A one-frame style change repaints it.
+      [bg, fg].forEach((img) =>
+        img.addEventListener("load", () => {
+          img.style.opacity = "0.999";
+          requestAnimationFrame(() => requestAnimationFrame(() => (img.style.opacity = "")));
+        })
+      );
       this.el = root;
       this.n = { shadow, tilt, flip, front, art, bg, fg, text, title, sub, serial, backSerial, artFoil, fgFoil, frameFoil, backFoil, sandCanvas };
     }
@@ -506,6 +616,7 @@
         if (!this.sand) this.sand = new Sand(n.sandCanvas);
         this.sand.setColor(v.sandColor);
         this.sand.setAmount(v.sandAmount);
+        this._sandGrain = v.sandGrain;
         if (!this._unRaw && this.opts.gyro) {
           this._unRaw = HC.gyro.subscribeRaw((tx, ty) => {
             this._tiltDeg = [tx, ty];
@@ -667,18 +778,21 @@
       HC.ticker.add(this._tick);
     }
 
+    /** Flip to the back and on round to the front: always the same way, two flips make a full turn. */
     flip(to) {
-      this.flipped = typeof to === "boolean" ? to : !this.flipped;
-      this.s.flip.set(this.flipped ? 180 : 0);
+      const next = typeof to === "boolean" ? to : !this.flipped;
+      if (next !== this.flipped) onward(this.s.flip);
+      this.flipped = next;
       this.el.classList.toggle("hc--flipped", this.flipped);
       HC.ticker.add(this._tick);
       this.el.dispatchEvent(new CustomEvent("hc:flip", { detail: this.flipped }));
     }
 
-    /** Turn the card upside down (and back). Quicksand pours to the new bottom. */
+    /** Turn the card upside down and on round the same way. Quicksand pours to the new bottom. */
     turn(to) {
-      this.turned = typeof to === "boolean" ? to : !this.turned;
-      this.s.rot.set(this.turned ? 180 : 0);
+      const next = typeof to === "boolean" ? to : !this.turned;
+      if (next !== this.turned) onward(this.s.rot);
+      this.turned = next;
       this.el.classList.toggle("hc--turned", this.turned);
       HC.ticker.add(this._tick);
       this._wakeSand();
@@ -716,11 +830,11 @@
         // Not laid out yet; try again for a moment.
         return ++this._sandWait < 120;
       }
-      // Fine grains: about 1.5 CSS pixels each, within a budget of cells.
-      let cols = clamp(Math.round(w / 1.5), 90, 240);
+      // Grain size in CSS pixels (chosen in the maker), within a budget of cells.
+      let cols = clamp(Math.round(w / (this._sandGrain || 1.5)), 40, 300);
       let rows = Math.max(8, Math.round((cols * h) / w));
-      if (cols * rows > 80000) {
-        const k = Math.sqrt(80000 / (cols * rows));
+      if (cols * rows > 90000) {
+        const k = Math.sqrt(90000 / (cols * rows));
         cols = Math.round(cols * k);
         rows = Math.round(rows * k);
       }
