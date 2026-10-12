@@ -57,6 +57,8 @@
   }
   HC.icon = icon;
 
+  // The Android app's WebView can't save downloads; cards move between devices with sync or links there.
+  const CAN_EXPORT = !(MODE.tauri && MODE.android);
   const narrow = () => matchMedia("(max-width: 860px)").matches;
 
   /* ------------------------------------------------------------------ */
@@ -272,7 +274,7 @@
         { icon: "cards", label: T("打開"), run: () => actions.open(c) },
         { icon: "expand", label: T("全螢幕"), run: () => actions.fullscreen(c) },
         { icon: "share", label: T("分享連結"), run: () => actions.share(c) },
-        { icon: "download", label: T("匯出卡片檔"), run: () => actions.exportFile(c) },
+        { icon: "download", label: T("匯出卡片檔"), run: () => actions.exportFile(c), hidden: !CAN_EXPORT },
         c.own ? "-" : null,
         { icon: "edit", label: T("編輯"), run: () => actions.edit(c), hidden: !c.own },
         { icon: "trash", label: T("刪除"), danger: true, run: () => actions.remove(c, reload), hidden: !c.own },
@@ -513,7 +515,7 @@
       row("expand", T("全螢幕"), () => actions.fullscreen(card.data), "F"),
       flipRow,
       data.sand && data.fg ? row("turn", T("上下顛倒"), () => card.turn(), "T") : null,
-      row("download", T("匯出卡片檔"), () => actions.exportFile(data)),
+      CAN_EXPORT ? row("download", T("匯出卡片檔"), () => actions.exportFile(data)) : null,
       data.own ? row("edit", T("編輯"), () => actions.edit(data), "E") : null,
       data.own ? row("trash", T("刪除"), () => actions.remove(data, () => HC.go("#/")), "Del", true) : null,
     ];
@@ -561,7 +563,7 @@
         HC.appMenu(
           [
             { icon: "turn", label: T("上下顛倒"), run: () => card.turn(), hidden: !(data.sand && data.fg) },
-            { icon: "download", label: T("匯出卡片檔"), run: () => actions.exportFile(data) },
+            { icon: "download", label: T("匯出卡片檔"), run: () => actions.exportFile(data), hidden: !CAN_EXPORT },
             { icon: "phone", label: T("重新校正水平"), run: () => (HC.gyro.recenter(), HC.toast(T("已重新校正"))), hidden: !(HC.gyro && HC.gyro.receiving) },
             data.own ? "-" : null,
             { icon: "trash", label: T("刪除"), danger: true, run: () => actions.remove(data, () => HC.go("#/")), hidden: !data.own },
