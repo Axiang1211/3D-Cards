@@ -129,6 +129,8 @@
     scale(calc(var(--zoom) * var(--fzoom, 1)));
 }
 .hc__fg { filter: drop-shadow(0 1.6cqw 2cqw rgba(0, 0, 0, .35)); }
+/* Own GPU layers: the shadow and the blur are drawn once, then only moved while the card tilts. */
+.hc__bg, .hc__fg, .hc__sand { will-change: transform; }
 /* The foreground foil takes the exact shape of the foreground picture. */
 .hc__foil--fg {
   -webkit-mask-size: cover;

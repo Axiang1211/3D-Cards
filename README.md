@@ -190,6 +190,8 @@ public/
   js/cutout.js           自動摳圖（在瀏覽器裡執行）
   js/cloud.js            Google 登入與雲端同步
   js/fullscreen.js       全螢幕檢視
+  js/sand-core.js        流沙模擬
+  js/sand-worker.js      讓流沙在另一個 CPU 核心上跑
   models/u2netp.onnx     自動摳圖模型（U²-Netp，Apache-2.0）
   js/desktop.js          電腦版專用：外部連結、版本檢查
   brand/                 Logo 和網站圖示
