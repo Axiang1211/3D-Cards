@@ -388,6 +388,17 @@
       refresh();
     }, (o) => h("span.frame-chip", { "aria-hidden": "true", dataset: { frame: o.id } }));
 
+    /* Back of the card ---------------------------------------------------- */
+    let backTimer = 0;
+    const backLogoF = segGroup("backLogo", HC.t("背面 Logo"), HC.BACK_LOGOS, draft.backLogo, (v) => {
+      draft.backLogo = v;
+      refresh();
+      // Show the back for a moment, then turn on round to the front.
+      clearTimeout(backTimer);
+      card.flip(true);
+      backTimer = setTimeout(() => card.flip(false), 1800);
+    });
+
     /* Save -------------------------------------------------------------- */
     const saveBtn = h("button.btn.btn--ink.btn--wide", { type: "submit" }, editing ? HC.t("儲存變更") : HC.t("儲存到展廳"));
     const form = h(
@@ -432,7 +443,7 @@
         serialField,
         h("label.check", showText, h("span", HC.t("在卡片上顯示文字")))
       ),
-      h("fieldset.group", h("legend.group__title", HC.t("邊框")), frameF),
+      h("fieldset.group", h("legend.group__title", HC.t("邊框")), frameF, backLogoF),
       h(
         "div.maker__actions",
         saveBtn,

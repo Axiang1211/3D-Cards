@@ -36,6 +36,11 @@
     { id: "silver", name: T("銀") },
     { id: "gold", name: T("金") },
   ];
+  HC.BACK_LOGOS = [
+    { id: "color", name: T("原圖") },
+    { id: "manga", name: T("黑白漫畫") },
+  ];
+  const BACK_LOGO_SRC = { color: "brand/logo-mark-192.png", manga: "brand/logo-mark-manga-192.png" };
   HC.foilName = (id) => (HC.FOILS.find((f) => f.id === id) || HC.FOILS[0]).name;
 
   HC.FG_FOILS = [{ id: "none", name: T("無") }].concat(HC.FOILS.filter((f) => f.id !== "gloss"));
@@ -71,6 +76,7 @@
     sandColor: "#ffd26e",
     sandAmount: 50, // % of the picture, 10..80
     sandGrain: 1.5, // grain size in CSS pixels, 1..4
+    backLogo: "color", // logo on the back: "color" (original) or "manga" (black and white)
   };
 
   /** Clamp every numeric field into its valid range. */
@@ -98,6 +104,7 @@
       sandColor: /^#[0-9a-f]{6}$/i.test(c.sandColor || "") ? String(c.sandColor).toLowerCase() : "#ffd26e",
       sandAmount: n(c.sandAmount, 50, 10, 80),
       sandGrain: n(c.sandGrain, 1.5, 1, 4),
+      backLogo: pick(c.backLogo, HC.BACK_LOGOS, "color"),
     };
   };
 
@@ -546,10 +553,10 @@
       const mark = el("div", "hc__back-mark", back);
       const cfg = window.HC_CONFIG || {};
       const logo = el("img", "hc__back-logo", mark);
-      logo.src = cfg.backLogo || "brand/logo-mark-192.png";
+      logo.src = cfg.backLogo || BACK_LOGO_SRC.color;
       logo.alt = "";
       logo.draggable = false;
-      logo.addEventListener("error", () => logo.remove());
+      logo.addEventListener("error", () => (logo.hidden = true));
       el("span", "", mark).textContent = (cfg.siteName || "3D Cards").toUpperCase();
       const backSerial = el("span", "hc__back-serial", back);
       const backFoil = [el("div", "hc__foil hc__foil--back", back)];
@@ -565,7 +572,7 @@
         })
       );
       this.el = root;
-      this.n = { shadow, tilt, flip, front, art, bg, fg, text, title, sub, serial, backSerial, artFoil, fgFoil, frameFoil, backFoil, sandCanvas };
+      this.n = { shadow, tilt, flip, front, art, bg, fg, text, title, sub, serial, backSerial, backLogo: logo, artFoil, fgFoil, frameFoil, backFoil, sandCanvas };
     }
 
     /** Replace the card's content without rebuilding it. */
@@ -608,6 +615,13 @@
       paint(n.frameFoil, v.foil, v.foilStrength, v.foilScale, v.foilHue, bgOn && frame !== "none" && (area === "full" || area === "frame"));
       paint(n.fgFoil, v.fgFoil, v.fgFoilStrength, v.foilScale, v.fgFoilHue, hasFg && v.fgFoil !== "none");
       paint(n.backFoil, v.foil === "gloss" ? "rainbow" : v.foil, 100, 100, v.foilHue, true);
+      // Logo on the back: the original picture or a black-and-white manga version.
+      const logoSrc = (window.HC_CONFIG || {}).backLogo || BACK_LOGO_SRC[v.backLogo] || BACK_LOGO_SRC.color;
+      if (n.backLogo.getAttribute("src") !== logoSrc) {
+        n.backLogo.hidden = false;
+        n.backLogo.src = logoSrc;
+      }
+      this.el.dataset.backLogo = v.backLogo;
       // Quicksand needs a foreground to sit behind.
       const sandOn = hasFg && v.sand;
       this.el.classList.toggle("hc--sand", sandOn);
