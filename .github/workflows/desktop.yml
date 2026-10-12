@@ -140,7 +140,9 @@ jobs:
           npx tauri android build --apk --ci --target aarch64 armv7 --config "{\"version\":\"$VERSION\"}" 2>&1 | tee build.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            { grep -nE "error|Error|FAILED|failed" build.log | tail -n 30; } | sed -e 's/%/%25/g' -e 's/^/::error::/'
+            # One annotation with the end of the log (GitHub shows at most 10 annotations per step).
+            msg=$(tail -n 60 build.log | sed -e 's/\x1b\[[0-9;]*m//g' -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Android build::$msg"
             exit "$status"
           fi
           find src-tauri/gen/android/app/build/outputs -name "*.apk" -print
