@@ -78,7 +78,8 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" 3D-Cards-Setup.exe --clobber
           else
-            gh release create "$tag" 3D-Cards-Setup.exe \
+            # Tag the commit that was built, so 「建置 Microsoft Store 版」 can build the same code.
+            gh release create "$tag" 3D-Cards-Setup.exe --target "$GITHUB_SHA" \
               --title "3D Cards $VERSION" \
               --notes "Windows：下載 **3D-Cards-Setup.exe** 並執行即可安裝或更新。Mac：下載 **3D-Cards.dmg**，打開後把 3D Cards 拖到「應用程式」資料夾。Android：下載 **3D-Cards.apk** 安裝（要允許安裝不明來源的應用程式）。已安裝的 App 打開時會提示更新。" \
               --latest

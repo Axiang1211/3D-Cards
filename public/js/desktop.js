@@ -17,6 +17,10 @@
   const RELEASE_API = "https://api.github.com/repos/" + REPO + "/releases/latest";
   const RELEASE_PAGE = "https://github.com/" + REPO + "/releases/latest";
   const SKIP_KEY = "hc:skip-version";
+  // The Microsoft Store app is updated by the Store, on the owner's schedule, not from GitHub releases.
+  const STORE_PAGE = "https://apps.microsoft.com/detail/9NF04B59SKW3";
+  let storeApp = null;
+  const isStoreApp = () => storeApp || (storeApp = Promise.resolve(T.core.invoke("is_store_app")).catch(() => false));
 
   const openUrl = (url) => {
     try {
@@ -116,6 +120,10 @@
   }
 
   async function checkForUpdates(manual) {
+    if (await isStoreApp()) {
+      if (manual) openUrl(STORE_PAGE).catch(() => {});
+      return;
+    }
     let current;
     let release;
     try {
