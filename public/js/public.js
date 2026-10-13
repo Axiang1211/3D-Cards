@@ -3,7 +3,7 @@
  * The public gallery: cards people chose to show everyone, after review.
  *
  *   #/public       the gallery, sorted by recommended / most liked / newest
- *   #/p/<id>       one card: author, date, likes and dislikes, take-down notice
+ *   #/p/<id>       one card: author, date, likes and dislikes, report, take-down notice
  *   #/admin        review (site owner only)
  *
  * Also: HC.pub.submit(card) — "show in the public gallery" from your own card,
@@ -110,6 +110,68 @@
     down.addEventListener("click", () => cast(-1));
     sync();
     return wrap;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Reporting someone else's card                                       */
+  /* ------------------------------------------------------------------ */
+  const REASONS = [
+    ["sexual", () => T("色情或裸露")],
+    ["violence", () => T("暴力或血腥")],
+    ["hate", () => T("仇恨、歧視或騷擾")],
+    ["copyright", () => T("侵犯版權（用了別人的照片）")],
+    ["spam", () => T("垃圾訊息或詐騙")],
+    ["other", () => T("其他")],
+  ];
+  const reasonText = (id) => (REASONS.find((r) => r[0] === id) || REASONS[REASONS.length - 1])[1]();
+
+  /** Asks why, sends the report. Resolves to { hidden } when sent, or null. */
+  async function report(it) {
+    if (!(await HC.account.signIn())) return null;
+    return new Promise((resolve) => {
+      const dlg = h("dialog.share", { "aria-labelledby": "rep-title" });
+      const radios = REASONS.map(([id, label]) => {
+        const r = h("input", { type: "radio", name: "rep-reason", value: id });
+        return { r, row: h("label.check", r, h("span", label())) };
+      });
+      const note = h("textarea.input", { rows: 3, maxlength: 300, placeholder: T("補充說明（可留空）") });
+      const go = h("button.btn.btn--ink", { type: "submit", disabled: true }, T("送出檢舉"));
+      const msg = h("p.share__note", { role: "status" });
+      radios.forEach(({ r }) => r.addEventListener("change", () => (go.disabled = false)));
+      let result = null;
+      const form = h(
+        "form.share__body",
+        h("p.share__note", T("檢舉「{title}」。管理員會看過檢舉的內容；被多人檢舉的卡片會先從公開展廳下架，等待重新審核。", { title: it.title || T("未命名卡片") })),
+        h("fieldset.pub-source", h("legend.pub-source__legend", T("這張卡片有什麼問題？")), radios.map((x) => x.row)),
+        h("label.field", h("span.field__label", T("補充說明")), note),
+        msg,
+        h("div.share__actions", go, h("button.btn.btn--quiet", { type: "button", onclick: () => dlg.close() }, T("取消")))
+      );
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const picked = radios.find((x) => x.r.checked);
+        if (!picked) return;
+        go.disabled = true;
+        msg.className = "share__note";
+        msg.textContent = T("正在送出…");
+        try {
+          result = await HC.account.call("POST", `/api/public/${it.id}/report`, { reason: picked.r.value, note: note.value });
+          dlg.close();
+        } catch (err) {
+          go.disabled = false;
+          msg.textContent = err.message;
+          msg.className = "share__note share__warn";
+        }
+      });
+      dlg.append(h("div.share__head", h("h2.share__title", { id: "rep-title" }, T("檢舉這張卡片")), h("button.share__x", { type: "button", "aria-label": T("關閉"), onclick: () => dlg.close() }, "×")), form);
+      dlg.addEventListener("close", () => {
+        dlg.remove();
+        if (result) HC.toast(result.hidden ? T("謝謝你的檢舉。這張卡片已先從公開展廳下架，等待管理員重新審核。") : T("謝謝你的檢舉，管理員會盡快處理。"));
+        resolve(result);
+      });
+      document.body.appendChild(dlg);
+      dlg.showModal();
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -299,7 +361,7 @@
     return wrap;
   }
 
-  HC.pub = { submit, mine, statusOf, lockOf, settingsOf, useSettings, takeTemplate, ownCardPanel, cardData, votes, notice, dateText, sourceTag };
+  HC.pub = { submit, mine, statusOf, lockOf, settingsOf, useSettings, takeTemplate, ownCardPanel, cardData, votes, notice, dateText, sourceTag, report };
 
   /* ------------------------------------------------------------------ */
   /* Gallery page                                                        */
@@ -486,6 +548,10 @@
       it.mine || (who && who.admin)
         ? h("button.btn.btn--danger", { type: "button", onclick: async () => (await withdraw(it.id)) && HC.go("#/public") }, it.mine ? T("從公開展廳下架") : T("下架（管理員）"))
         : null;
+    const reportBtn =
+      it.status === "approved" && !it.mine
+        ? h("button.btn.btn--quiet", { type: "button", onclick: async () => { const r = await report(it); if (r && r.hidden) HC.go("#/public"); } }, T("檢舉"))
+        : null;
 
     room.appendChild(
       h(
@@ -500,7 +566,7 @@
           it.source === "repost" ? h("p.placard__meta.pub-repost-note", T("這是作者分享的公開照片，版權屬於原作者。版權方要求時會下架。")) : null,
           it.status === "approved" ? votes(it) : null
         ),
-        h("div.room__tools", h("div.room__actions", tools), takeDown ? h("div.room__own", takeDown) : null),
+        h("div.room__tools", h("div.room__actions", tools), takeDown || reportBtn ? h("div.room__own", reportBtn, takeDown) : null),
         notice()
       )
     );
@@ -540,6 +606,7 @@
     const seg = h("div.seg", { role: "radiogroup", "aria-label": T("狀態") });
     [
       ["pending", T("待審核")],
+      ["reported", T("被檢舉")],
       ["approved", T("已公開")],
       ["rejected", T("未通過")],
     ].forEach(([id, label]) => {
@@ -582,7 +649,7 @@
       if (action === "remove" && !confirm(T("從公開展廳下架？"))) return;
       try {
         await HC.account.call("POST", "/api/admin/public/" + it.id, { action, note });
-        HC.toast(action === "approve" ? T("已公開") : action === "reject" ? T("已退回") : T("已下架"));
+        HC.toast(action === "approve" ? (tab === "reported" ? T("已保留，檢舉已清除") : T("已公開")) : action === "reject" ? T("已退回") : T("已下架"));
         load();
       } catch (e) {
         HC.toast(e.message, "error");
@@ -634,10 +701,21 @@
               h("p.adm__meta", T("送出：{date}", { date: dateText(it.createdAt) })),
               wm,
               it.note ? h("p.adm__meta", T("備註：{note}", { note: it.note })) : null,
-              tab === "approved" ? h("p.adm__meta", T("{up} 個讚，{down} 個倒讚", { up: it.likes, down: it.dislikes })) : null,
+              tab === "approved" || tab === "reported" ? h("p.adm__meta", T("{up} 個讚，{down} 個倒讚", { up: it.likes, down: it.dislikes })) : null,
+              it.reports && it.reports.length
+                ? h(
+                    "div.adm__meta.adm__warn",
+                    T("被 {n} 人檢舉：", { n: it.reports.length }),
+                    h("ul.adm__reports", it.reports.map((r) => h("li", reasonText(r.reason), r.note ? T("（{note}）", { note: r.note }) : null)))
+                  )
+                : null,
               h(
                 "div.adm__actions",
-                tab !== "approved" ? h("button.btn.btn--ink.btn--sm", { type: "button", onclick: () => act(it, "approve") }, T("通過並公開")) : null,
+                tab === "reported"
+                  ? h("button.btn.btn--ink.btn--sm", { type: "button", title: T("卡片留在公開展廳，清除它的檢舉。"), onclick: () => act(it, "approve") }, T("保留並清除檢舉"))
+                  : tab !== "approved"
+                  ? h("button.btn.btn--ink.btn--sm", { type: "button", onclick: () => act(it, "approve") }, T("通過並公開"))
+                  : null,
                 tab === "pending" ? h("button.btn.btn--line.btn--sm", { type: "button", onclick: () => act(it, "reject") }, T("不通過")) : null,
                 h("button.btn.btn--quiet.btn--sm", { type: "button", onclick: () => act(it, "remove") }, T("下架並刪除"))
               )
