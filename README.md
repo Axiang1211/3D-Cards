@@ -8,7 +8,8 @@
 
 **線上使用：https://3dcards.app.dreamsworld.top/**
 
-**下載 App：https://3dcards.app.dreamsworld.top/#/download**（Windows、Android；Mac 和 iPhone 版即將推出）
+**下載 App：https://3dcards.app.dreamsworld.top/#/download**
+（Windows、Android；Mac 和 iPhone 版即將推出）
 
 **Windows App：[下載 3D-Cards-Setup.exe](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe)**　**Android App：[下載 3D-Cards.apk](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk)**　**iPhone / 其他：把網站安裝成 App**（見下方）
 
