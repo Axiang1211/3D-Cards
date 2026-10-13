@@ -1,4 +1,5 @@
 // Runs in the Android build (GitHub Actions) right after `tauri android init`.
+// Also sets the target Android version Google Play requires (see the end).
 // Replaces the generated MainActivity so the page never sits under the status
 // bar or the navigation bar: the WebView is padded by the system bar sizes and
 // the bars get the app's colour with light icons.
@@ -56,3 +57,10 @@ class MainActivity : TauriActivity() {
 `
 );
 console.log("Patched", file, "(package " + pkg + ")");
+
+// Google Play: new apps must target Android 16 (API 36).
+const gradle = path.join(root, "app", "build.gradle.kts");
+let g = fs.readFileSync(gradle, "utf8");
+g = g.replace(/compileSdk\s*=\s*\d+/, "compileSdk = 36").replace(/targetSdk\s*=\s*\d+/, "targetSdk = 36");
+fs.writeFileSync(gradle, g);
+console.log("Target SDK:", (/targetSdk\s*=\s*\d+/.exec(g) || ["(not found)"])[0]);
