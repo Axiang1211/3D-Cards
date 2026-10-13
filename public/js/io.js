@@ -132,8 +132,12 @@
       return out && out.size < blob.size ? out : scale < 1 && out ? out : blob;
     },
 
-    /** Smaller copies of the pictures for uploading a share (phones make big PNGs). */
+    /**
+     * Smaller copies of the pictures for uploading (phones make big PNGs). The photo
+     * gets the invisible watermark: the name it already carries, or the uploader's.
+     */
     async forUpload(bgBlob, fgBlob) {
+      const mark = HC.account && HC.watermark && bgBlob ? await HC.account.markFor(bgBlob).catch(() => null) : null;
       const LIMIT = 5.5 * 1024 * 1024;
       let side = 1600;
       let bg = bgBlob, fg = fgBlob;
@@ -142,6 +146,11 @@
         fg = fgBlob ? await this.shrink(fgBlob, { maxSide: side, alpha: true }) : null;
         if ((bg ? bg.size : 0) + (fg ? fg.size : 0) <= LIMIT) break;
         side = Math.round(side * 0.75);
+      }
+      if (bg && mark) {
+        try {
+          bg = await HC.watermark.embed(bg, mark, { type: bg.type === "image/webp" ? "image/webp" : "image/jpeg", quality: 0.88 });
+        } catch (e) {}
       }
       return [bg, fg];
     },
@@ -203,7 +212,8 @@
         },
         HC.normalize(c),
         {
-          imageBlob: await this.dataURLToBlob(c.image),
+          // Someone else's card: its watermark stays; an "unknown user" one gets your name.
+          imageBlob: HC.account ? await HC.account.adoptMark(await this.dataURLToBlob(c.image)) : await this.dataURLToBlob(c.image),
           fgBlob: c.fg ? await this.dataURLToBlob(c.fg) : null,
         }
       );

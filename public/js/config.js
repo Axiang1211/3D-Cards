@@ -33,6 +33,12 @@ window.HC_CONFIG = {
   /* "App 主頁": the page listing all Dreamsworld apps, linked at the top left and in the footer. Leave empty to hide. */
   hubUrl: "https://www.app.dreamsworld.top/",
 
+  /*
+   * Where people ask for a card in the public gallery to be taken down (copyright).
+   * Any link: a mailto:, a form, or the GitHub issues page.
+   */
+  contactUrl: "https://github.com/Axiang1211/3D-Cards/issues/new?title=%E5%85%AC%E9%96%8B%E5%B1%95%E5%BB%B3%E5%88%AA%E9%99%A4%E8%AB%8B%E6%B1%82",
+
   /* The newest Android app (APK) on the Releases page. Leave empty to hide the links. */
   apkUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk",
 };

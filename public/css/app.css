@@ -534,7 +534,7 @@ html.is-app .toast { background: var(--a-ink); color: var(--a-accent-ink); }
   .side { display: none; }
   .tabs {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     padding: 4px 6px env(safe-area-inset-bottom);
     background: var(--a-side);
     border-top: 1px solid var(--a-line);
@@ -610,4 +610,23 @@ html.is-app .toast { background: var(--a-ink); color: var(--a-accent-ink); }
 
 @media (prefers-reduced-motion: reduce) {
   html.is-app * { scroll-behavior: auto; }
+}
+
+/* Public gallery and review inside the app frame */
+html.is-app .app-page .pub,
+html.is-app .app-page .adm { padding-top: 22px; }
+html.is-app .app-page .pub-title { font-size: 26px; }
+html.is-app .pub-mine { background: var(--a-panel); }
+html.is-app .adm__item { background: var(--a-panel); }
+html.is-app .panel .pub-own { flex-direction: column; align-items: stretch; gap: 4px; }
+html.is-app .panel .pub-own .row { margin: 0 -10px; }
+html.is-app .panel .pub-status { color: var(--a-muted); padding-left: 2px; }
+html.is-app .vote.vote--up[aria-pressed="true"] { background: var(--a-accent); color: var(--a-accent-ink); }
+html.is-app .app-page .pub-title,
+html.is-app .app-page .adm__title { display: none; }
+html.is-app .app-page .pub-lead { margin-top: 0; }
+@media (max-width: 860px) {
+  html.is-app .app-page .pub,
+  html.is-app .app-page .adm { padding: 16px 14px 28px; }
+  html.is-app .pub-wall { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 14px; }
 }

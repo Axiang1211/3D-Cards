@@ -152,6 +152,9 @@
     if ((m = hash.match(/^\/create(?:\/([\w-]+))?\/?$/))) return { name: "create", id: m[1] || null };
     if ((m = hash.match(/^\/s\/([A-Za-z0-9]+)\/?$/))) return { name: "shared", id: m[1] };
     if (/^\/download\/?$/.test(hash)) return { name: "download" };
+    if (/^\/public\/?$/.test(hash)) return { name: "public" };
+    if ((m = hash.match(/^\/p\/([A-Za-z0-9]+)\/?$/))) return { name: "pubcard", id: m[1] };
+    if (/^\/admin\/?$/.test(hash)) return { name: "admin" };
     // Pages that only the app has; the website shows its gallery instead.
     if (APP && /^\/samples\/?$/.test(hash)) return { name: "samples" };
     if (APP && /^\/settings\/?$/.test(hash)) return { name: "settings" };
@@ -165,7 +168,7 @@
     if (current && current.destroy) current.destroy();
     current = null;
     const next = HC.h("div.view.view--" + r.name);
-    document.body.dataset.view = r.name === "shared" ? "detail" : r.name;
+    document.body.dataset.view = r.name === "shared" || r.name === "pubcard" ? "detail" : r.name;
     if (APP) HC.appShellRoute(r.name);
     else
       document.querySelectorAll("[data-nav]").forEach((a) => {
@@ -237,6 +240,8 @@
         a.setAttribute("aria-label", HC.t("回到 Dreamsworld App 主頁"));
       } else a.hidden = true;
     });
+    const adminLink = document.getElementById("admin-link");
+    if (adminLink && HC.account && HC.cloud && HC.cloud.signedIn) HC.account.me().then((m) => m && m.admin && (adminLink.hidden = false));
     const dl = document.getElementById("download-link");
     if (dl && window.HC_DESKTOP) dl.hidden = true;
     const repo = document.getElementById("repo-link");

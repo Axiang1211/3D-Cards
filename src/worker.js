@@ -1,3 +1,5 @@
+import { galleryApi } from "./gallery.js";
+
 /**
  * 3D Cards — Cloudflare Worker
  *
@@ -11,6 +13,8 @@
  * Shared cards expire after SHARE_DAYS days: KV deletes them on its own.
  *
  *   GET    /s/:id                  the share page (index.html with link-preview tags)
+ *
+ * Public gallery, accounts and votes: see gallery.js (/api/me, /api/public, /api/admin).
  *
  * Storage: the KV namespace bound as SHARES (created automatically on first deploy).
  * Optional secret ADMIN_TOKEN lets the site owner delete any share.
@@ -70,6 +74,9 @@ export default {
 async function api(request, env, url) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (url.pathname === "/api/release" && request.method === "GET") return release(env);
+  if (/^\/api\/(me|public|admin)(\/|$)/.test(url.pathname)) {
+    return galleryApi(request, env, url, { json, cleanCard, randomId, sha256, IMAGE_RE });
+  }
   if (!env.SHARES && !url.pathname.startsWith("/api/google/")) return json({ error: "這個網站沒有開啟分享功能。" }, 501);
 
   if (url.pathname.startsWith("/api/google/")) return google(request, env, url.pathname.slice(12), url);
@@ -99,49 +106,9 @@ async function createShare(request, env, url) {
   }
 
   const c = body && body.card;
-  if (!c || typeof c !== "object") return json({ error: "資料格式不正確。" }, 400);
-
-  const img = IMAGE_RE.exec(c.image || "");
-  if (!img) return json({ error: "缺少照片，或照片格式不是 JPG、PNG、WebP。" }, 400);
-  let size = b64size(img[2]);
-  let fg = "";
-  if (c.fg) {
-    const f = IMAGE_RE.exec(c.fg);
-    if (!f) return json({ error: "前景圖的格式不正確。" }, 400);
-    size += b64size(f[2]);
-    fg = c.fg;
-  }
-  if (size > MAX_IMAGES) return json({ error: "卡片太大了，請換小一點的照片。" }, 413);
-
-  const card = {
-    title: str(c.title, 40),
-    subtitle: str(c.subtitle, 60),
-    serial: str(c.serial, 16),
-    foil: pick(c.foil, FOILS, "rainbow"),
-    area: pick(c.area, AREAS, "full"),
-    frame: pick(c.frame, FRAMES, "white"),
-    zoom: num(c.zoom, 1, 1, 4),
-    posX: num(c.posX, 50, 0, 100),
-    posY: num(c.posY, 50, 0, 100),
-    bgBlur: num(c.bgBlur, 0, 0, 100),
-    foilStrength: num(c.foilStrength, 100, 0, 200),
-    foilScale: num(c.foilScale, 100, 50, 200),
-    foilHue: num(c.foilHue, 0, 0, 360),
-    fgZoom: num(c.fgZoom, 1, 0.5, 3),
-    fgX: num(c.fgX, 0, -50, 50),
-    fgY: num(c.fgY, 0, -50, 50),
-    fgFoil: pick(c.fgFoil, FG_FOILS, "none"),
-    fgFoilStrength: num(c.fgFoilStrength, 100, 0, 200),
-    fgFoilHue: num(c.fgFoilHue, 0, 0, 360),
-    sand: c.sand === true,
-    sandColor: /^#[0-9a-fA-F]{6}$/.test(c.sandColor || "") ? String(c.sandColor).toLowerCase() : "#ffd26e",
-    sandAmount: num(c.sandAmount, 50, 10, 80),
-    sandGrain: num(c.sandGrain, 1.5, 1, 4),
-    backLogo: pick(c.backLogo, ["color", "manga"], "color"),
-    showText: c.showText !== false,
-    image: c.image,
-    fg,
-  };
+  const checked = cleanCard(c);
+  if (checked.error) return json({ error: checked.error }, checked.status || 400);
+  const card = checked.card;
 
   let id = "";
   for (let i = 0; i < 5 && !id; i++) {
@@ -459,4 +426,51 @@ async function release(env) {
   const res = json(out, 200, { "Cache-Control": "public, max-age=600" });
   if (out.version) await cache.put(key, res.clone());
   return res;
+}
+
+/** Checks a card sent by a browser and keeps only known settings. Returns { card } or { error, status }. */
+function cleanCard(c) {
+  if (!c || typeof c !== "object") return { error: "資料格式不正確。" };
+  const img = IMAGE_RE.exec(c.image || "");
+  if (!img) return { error: "缺少照片，或照片格式不是 JPG、PNG、WebP。" };
+  let size = b64size(img[2]);
+  let fg = "";
+  if (c.fg) {
+    const f = IMAGE_RE.exec(c.fg);
+    if (!f) return { error: "前景圖的格式不正確。" };
+    size += b64size(f[2]);
+    fg = c.fg;
+  }
+  if (size > MAX_IMAGES) return { error: "卡片太大了，請換小一點的照片。", status: 413 };
+
+  const card = {
+    title: str(c.title, 40),
+    subtitle: str(c.subtitle, 60),
+    serial: str(c.serial, 16),
+    foil: pick(c.foil, FOILS, "rainbow"),
+    area: pick(c.area, AREAS, "full"),
+    frame: pick(c.frame, FRAMES, "white"),
+    zoom: num(c.zoom, 1, 1, 4),
+    posX: num(c.posX, 50, 0, 100),
+    posY: num(c.posY, 50, 0, 100),
+    bgBlur: num(c.bgBlur, 0, 0, 100),
+    foilStrength: num(c.foilStrength, 100, 0, 200),
+    foilScale: num(c.foilScale, 100, 50, 200),
+    foilHue: num(c.foilHue, 0, 0, 360),
+    fgZoom: num(c.fgZoom, 1, 0.5, 3),
+    fgX: num(c.fgX, 0, -50, 50),
+    fgY: num(c.fgY, 0, -50, 50),
+    fgFoil: pick(c.fgFoil, FG_FOILS, "none"),
+    fgFoilStrength: num(c.fgFoilStrength, 100, 0, 200),
+    fgFoilHue: num(c.fgFoilHue, 0, 0, 360),
+    sand: c.sand === true,
+    sandColor: /^#[0-9a-fA-F]{6}$/.test(c.sandColor || "") ? String(c.sandColor).toLowerCase() : "#ffd26e",
+    sandAmount: num(c.sandAmount, 50, 10, 80),
+    sandGrain: num(c.sandGrain, 1.5, 1, 4),
+    backLogo: pick(c.backLogo, ["color", "manga"], "color"),
+    showText: c.showText !== false,
+    image: c.image,
+    fg,
+  };
+  return { card };
 }

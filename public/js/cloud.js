@@ -277,6 +277,7 @@
   }
 
   async function signOut() {
+    if (HC.account) HC.account.forget();
     const access = token && token.access;
     token = null;
     ls.set(K_ON, null);
@@ -308,12 +309,14 @@
     },
     sync,
     signOut,
+    /** A current Google access token (signs in again quietly when it can). Throws "signin". */
+    token: getToken,
   };
 
   /* ------------------------------------------------------------------ */
   /* Dialog                                                              */
   /* ------------------------------------------------------------------ */
-  HC.openCloud = function (onChange) {
+  HC.openCloud = function (onChange, onClose) {
     const dlg = h("dialog.share", { "aria-labelledby": "cloud-title" });
     const body = h("div.share__body");
     const close = () => dlg.close();
@@ -331,6 +334,7 @@
     dlg.addEventListener("close", () => {
       view.cancelled = true;
       dlg.remove();
+      if (onClose) onClose();
     });
     document.body.appendChild(dlg);
     dlg.showModal();
@@ -386,7 +390,9 @@
         }
         ls.set(K_ON, "1");
         await fetchEmail();
+        if (HC.account) HC.account.forget();
         render();
+        if (onChange) onChange();
         await runSync();
       } catch (e) {
         if (e.message === "cancelled") return;

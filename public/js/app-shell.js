@@ -66,6 +66,7 @@
   /* ------------------------------------------------------------------ */
   const NAV = [
     { id: "library", href: "#/", icon: "cards", label: () => T("我的卡片") },
+    { id: "public", href: "#/public", icon: "globe", label: () => T("公開展廳") },
     { id: "samples", href: "#/samples", icon: "sparkle", label: () => T("示範作品") },
     { id: "create", href: "#/create", icon: "plus", label: () => T("製作卡片") },
   ];
@@ -101,8 +102,9 @@
       "nav.tabs",
       { "aria-label": T("主要") },
       h("a.tabs__item", { href: "#/", dataset: { nav: "library" } }, icon("cards"), h("span", T("我的卡片"))),
-      h("a.tabs__item", { href: "#/samples", dataset: { nav: "samples" } }, icon("sparkle"), h("span", T("示範"))),
+      h("a.tabs__item", { href: "#/public", dataset: { nav: "public" } }, icon("globe"), h("span", T("展廳"))),
       h("a.tabs__item.tabs__item--make", { href: "#/create", dataset: { nav: "create" } }, icon("plus"), h("span", T("製作"))),
+      h("a.tabs__item", { href: "#/samples", dataset: { nav: "samples" } }, icon("sparkle"), h("span", T("示範"))),
       h("a.tabs__item", { href: "#/settings", dataset: { nav: "settings" } }, icon("gear"), h("span", T("設定")))
     );
     const shell = h("div.shell", side, h("div.shell__main", view), tabs);
@@ -129,7 +131,7 @@
 
   /* Router hook: highlight the current page. */
   HC.appShellRoute = function (name) {
-    const id = name === "detail" ? null : name === "gallery" ? "library" : name;
+    const id = name === "detail" ? null : name === "gallery" ? "library" : name === "pubcard" ? "public" : name;
     document.querySelectorAll("[data-nav]").forEach((a) => a.toggleAttribute("aria-current", a.dataset.nav === id));
     document.documentElement.dataset.page = name;
   };
@@ -517,6 +519,7 @@
       data.sand && data.fg ? row("turn", T("上下顛倒"), () => card.turn(), "T") : null,
       CAN_EXPORT ? row("download", T("匯出卡片檔"), () => actions.exportFile(data)) : null,
       data.own ? row("edit", T("編輯"), () => actions.edit(data), "E") : null,
+      data.own && HC.pub && HC.cloud && HC.cloud.available ? HC.pub.ownCardPanel(data, "row") : null,
       data.own ? row("trash", T("刪除"), () => actions.remove(data, () => HC.go("#/")), "Del", true) : null,
     ];
 
@@ -564,6 +567,7 @@
           [
             { icon: "turn", label: T("上下顛倒"), run: () => card.turn(), hidden: !(data.sand && data.fg) },
             { icon: "download", label: T("匯出卡片檔"), run: () => actions.exportFile(data), hidden: !CAN_EXPORT },
+            { icon: "globe", label: T("公開到展廳"), run: () => HC.pub.submit(data), hidden: !(data.own && HC.pub && HC.cloud && HC.cloud.available) },
             { icon: "phone", label: T("重新校正水平"), run: () => (HC.gyro.recenter(), HC.toast(T("已重新校正"))), hidden: !(HC.gyro && HC.gyro.receiving) },
             data.own ? "-" : null,
             { icon: "trash", label: T("刪除"), danger: true, run: () => actions.remove(data, () => HC.go("#/")), hidden: !data.own },
@@ -663,6 +667,28 @@
   };
 
   /* ------------------------------------------------------------------ */
+  /* Public gallery, one public card, review: the shared pages in the frame */
+  /* ------------------------------------------------------------------ */
+  HC.appViews.public = async function (root, route) {
+    root.appendChild(header({ title: T("公開展廳") }));
+    const inner = h("div.app-page");
+    root.appendChild(inner);
+    return HC.views.public(inner, route);
+  };
+  HC.appViews.pubcard = async function (root, route) {
+    root.appendChild(header({ title: T("公開的卡片"), back: { href: "#/public", label: T("公開展廳") } }));
+    const inner = h("div.shared");
+    root.appendChild(inner);
+    return HC.views.pubcard(inner, route);
+  };
+  HC.appViews.admin = async function (root, route) {
+    root.appendChild(header({ title: T("審核"), back: { href: "#/settings", label: T("設定") } }));
+    const inner = h("div.app-page");
+    root.appendChild(inner);
+    return HC.views.admin(inner, route);
+  };
+
+  /* ------------------------------------------------------------------ */
   /* Settings                                                            */
   /* ------------------------------------------------------------------ */
   HC.appViews.settings = async function (root) {
@@ -708,6 +734,7 @@
     const sections = [
       set(T("語言"), T("介面顯示的語言。"), lang),
       set(T("雲端同步"), cloudText, cloudBtn),
+      HC.cloud && HC.cloud.available ? publicNameRow() : null,
       HC.gyro && HC.gyro.available ? set(T("動作感應"), T("轉動手機時，卡片和流沙會跟著動。"), gyroBtn) : null,
       set(
         T("卡片"),
@@ -744,6 +771,28 @@
       },
     };
   };
+
+  /** Settings row: the name shown in the public gallery, and review for the site owner. */
+  function publicNameRow() {
+    const text = h("p.set__value", T("登入 Google 後，可以設定在公開展廳顯示的名稱。"));
+    const btn = h("button.btn.btn--soft", { type: "button" }, T("設定名稱"));
+    const admin = h("a.btn.btn--soft", { href: "#/admin", hidden: true }, T("審核"));
+    const sync = async () => {
+      const who = HC.account ? await HC.account.me() : null;
+      if (who) {
+        text.textContent = who.name ? T("公開展廳顯示為「{name}」。", { name: who.name }) : T("還沒有設定公開名稱。");
+        btn.textContent = who.name ? T("修改名稱") : T("設定名稱");
+        admin.hidden = !who.admin;
+      }
+    };
+    btn.addEventListener("click", async () => {
+      if (!(await HC.account.signIn())) return;
+      await HC.account.ensureName(true);
+      sync();
+    });
+    sync();
+    return set(T("公開名稱"), text, h("div.set__row", btn, admin));
+  }
 
   function set(title, text, control) {
     return h(

@@ -45,13 +45,27 @@
     <li>使用「用 Google 同步」時，我們會向 Google 要求兩項權限：
       <ul>
         <li><code>drive.appdata</code>：在你的 Google 雲端硬碟裡建立一個<strong>只有 3D Cards 能存取的隱藏資料夾</strong>，用來存放你的卡片。我們<strong>無法</strong>看到或存取你雲端硬碟裡的其他任何檔案。</li>
-        <li><code>email</code>、<code>openid</code>：讀取你的 Google 帳號電子郵件，只用來在畫面上顯示「已登入：你的信箱」。</li>
+        <li><code>email</code>、<code>openid</code>：讀取你的 Google 帳號 ID 和電子郵件，用來在畫面上顯示「已登入：你的信箱」，以及在公開展廳辨認你的帳號（見下方）。</li>
       </ul>
     </li>
     <li>你的卡片直接在你的裝置和你的 Google 雲端硬碟之間傳送，<strong>不會經過或存放在我們的伺服器</strong>。</li>
     <li>登入憑證（存取權杖）只保存在你的裝置上。在 App 裡登入時，憑證會在我們的伺服器暫存最多 10 分鐘以便交給 App，取走後立即刪除。</li>
     <li>按「登出」會撤銷授權並刪除裝置上的憑證。你也可以隨時到 <a href="https://myaccount.google.com/permissions">Google 帳戶的第三方存取權</a> 移除 3D Cards。</li>
     <li>3D Cards 對 Google API 所取得資訊的使用與傳輸，遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API 服務使用者資料政策</a>，包括「有限使用」規定。我們不會出售、轉讓這些資料，也不會用於廣告或訓練人工智慧模型。</li>
+  </ul>
+
+  <h2>公開展廳、讚與倒讚</h2>
+  <ul>
+    <li>登入 Google 後，你可以把自己的卡片送到公開展廳。送出時，卡片（含照片）會上傳到網站伺服器（Cloudflare），由網站管理員審核，通過後所有人都看得到。</li>
+    <li>公開展廳會顯示你設定的<strong>公開名稱</strong>、卡片內容、讚和倒讚的數量、公開日期，<strong>不會顯示你的 Google 帳號或電子郵件</strong>。</li>
+    <li>伺服器會保存：你的 Google 帳號 ID、電子郵件（只有管理員在審核時看得到，用來聯絡）、公開名稱、你送出的卡片，以及你按的讚和倒讚。</li>
+    <li>你可以隨時下架自己公開的卡片，卡片和它的讚、倒讚會從伺服器刪除。要刪除整個帳號資料，請到 <a href="https://github.com/Axiang1211/3D-Cards/issues">GitHub</a> 留言。</li>
+  </ul>
+
+  <h2>隱形水印</h2>
+  <ul>
+    <li>建立分享連結或送到公開展廳時，照片會加上肉眼看不見的水印，記錄上傳者的公開名稱和一組代號（沒有登入時記錄為「unknown user」），用來處理版權爭議。</li>
+    <li>水印不包含你的電子郵件或 Google 帳號。照片已經有別人的水印時會保留原本的水印。</li>
   </ul>
 
   <h2>第三方服務</h2>
@@ -81,8 +95,14 @@
     <p>Only when you press “Create share link” is that one card (with its photos) uploaded to the site's server (Cloudflare), where anyone with the link can see it. Shared cards are <strong>deleted automatically after 14 days</strong>, or immediately when you press “Stop sharing”.</p>
 
     <h3>Google sign-in and cloud sync</h3>
-    <p>“Sync with Google” requests <code>drive.appdata</code>, which lets 3D Cards create a <strong>hidden folder in your Google Drive that only 3D Cards can access</strong> to store your cards; it cannot see any other files in your Drive. It also requests <code>email</code> and <code>openid</code>, used only to show which account you are signed in with. Cards travel directly between your device and your Google Drive and are <strong>not stored on our server</strong>. Sign-in tokens are kept on your device; during sign-in in the app they are held on our server for at most 10 minutes until the app collects them, then deleted. “Sign out” revokes access; you can also remove 3D Cards at <a href="https://myaccount.google.com/permissions">Google Account › Third-party access</a>.</p>
+    <p>“Sync with Google” requests <code>drive.appdata</code>, which lets 3D Cards create a <strong>hidden folder in your Google Drive that only 3D Cards can access</strong> to store your cards; it cannot see any other files in your Drive. It also requests <code>email</code> and <code>openid</code>, used to show which account you are signed in with and to recognise your account in the public gallery (see below). Cards travel directly between your device and your Google Drive and are <strong>not stored on our server</strong>. Sign-in tokens are kept on your device; during sign-in in the app they are held on our server for at most 10 minutes until the app collects them, then deleted. “Sign out” revokes access; you can also remove 3D Cards at <a href="https://myaccount.google.com/permissions">Google Account › Third-party access</a>.</p>
     <p>3D Cards' use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. We do not sell or transfer this data, and do not use it for advertising or to train AI models.</p>
+
+    <h3>Public gallery, likes and dislikes</h3>
+    <p>Signed in with Google, you can send your own cards to the public gallery. The card (with its photos) is uploaded to the site's server (Cloudflare) and reviewed by the site owner; once approved, everyone can see it. The gallery shows the <strong>public name</strong> you choose, the card, its likes and dislikes and the date, <strong>never your Google account or e-mail</strong>. The server keeps your Google account ID, e-mail (seen only by the admin during review, for contact), public name, the cards you send and your likes and dislikes. You can take your public cards down at any time, which deletes them and their votes. To delete all your account data, ask on <a href="https://github.com/Axiang1211/3D-Cards/issues">GitHub</a>.</p>
+
+    <h3>Invisible watermark</h3>
+    <p>When you create a share link or send a card to the public gallery, the photo gets an invisible watermark with the uploader's public name and a short code (“unknown user” when not signed in), used to handle copyright disputes. It contains no e-mail or Google account. A photo that already carries someone else's watermark keeps it.</p>
 
     <h3>Third parties</h3>
     <p>Cloudflare (hosting and share links), Google Fonts (fonts), jsDelivr (cut-out tool, on first use) GitHub (app updates and downloads) and Google Play (when installed from the Play Store). We use no analytics, tracking, advertising or cookies.</p>

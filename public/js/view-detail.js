@@ -139,6 +139,7 @@
         HC.go("#/");
       });
       ownTools = h("div.room__own", h("a.btn.btn--light", { href: "#/create/" + data.id }, HC.t("編輯")), del);
+      if (HC.pub && HC.cloud && HC.cloud.available) ownTools.appendChild(HC.pub.ownCardPanel(data));
     }
 
     const meta = h("p.placard__meta", HC.describe(data));
