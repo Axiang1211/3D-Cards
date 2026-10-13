@@ -440,6 +440,22 @@ async function release(env) {
       }
     }
   } catch (e) {}
+  // The GitHub API often refuses shared Cloudflare addresses (rate limit): read the release page instead.
+  if (!out.version) {
+    try {
+      const r = await fetch(`https://github.com/${REPO}/releases/latest`, { redirect: "manual", headers: { "User-Agent": "3d-cards-site" } });
+      const m = /\/tag\/v?([\w.-]+)$/.exec(r.headers.get("Location") || "");
+      if (m) out.version = m[1];
+      const size = async (file) => {
+        const h = await fetch(`https://github.com/${REPO}/releases/latest/download/${file}`, { method: "HEAD", headers: { "User-Agent": "3d-cards-site" } });
+        const n = +h.headers.get("Content-Length");
+        return h.ok && n ? { size: n } : null;
+      };
+      const [win, apk] = await Promise.all([size("3D-Cards-Setup.exe"), size("3D-Cards.apk")]);
+      if (win) out.assets.windows = win;
+      if (apk) out.assets.android = apk;
+    } catch (e) {}
+  }
   const res = json(out, 200, { "Cache-Control": "public, max-age=600" });
   if (out.version) await cache.put(key, res.clone());
   return res;
