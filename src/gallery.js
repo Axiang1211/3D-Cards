@@ -15,9 +15,12 @@
  *   GET    /api/public/:id             one card (approved, or yours / admin)
  *   GET    /api/public/:id/bg|fg       its pictures
  *   POST   /api/public/:id/vote        { value: 1 | -1 | 0 }                  (signed in)
+ *   POST   /api/public/:id/report      { reason, note } report someone else's card (signed in)
+ *                                      REPORT_HIDE different people → hidden until reviewed again
  *   DELETE /api/public/:id             take it down (author or admin)
- *   GET    /api/admin/public?status=pending|approved|rejected                 (admin)
+ *   GET    /api/admin/public?status=pending|approved|rejected|reported        (admin)
  *   POST   /api/admin/public/:id       { action: approve | reject | remove, note } (admin)
+ *                                      approve also clears the card's reports (= keep it)
  *
  * Signing in: requests carry "Authorization: Bearer <Google access token>";
  * the token is checked with Google once and remembered for 10 minutes.
@@ -30,6 +33,8 @@
 
 const PUB_ID = /^[A-Za-z0-9]{12}$/;
 const MAX_PENDING = 10; // per user, waiting for review at the same time
+const REPORT_HIDE = 3; // reports from different people that take a card off the gallery until reviewed
+const REPORT_REASONS = ["sexual", "violence", "hate", "copyright", "spam", "other"];
 
 let schemaReady = null;
 function ready(env) {
@@ -46,6 +51,7 @@ function ready(env) {
       env.DB.prepare("CREATE INDEX IF NOT EXISTS public_cards_status ON public_cards (status, reviewed_at)"),
       env.DB.prepare("CREATE INDEX IF NOT EXISTS public_cards_owner ON public_cards (owner_sub)"),
       env.DB.prepare("CREATE TABLE IF NOT EXISTS votes (card TEXT, sub TEXT, value INTEGER, at INTEGER, PRIMARY KEY (card, sub))"),
+      env.DB.prepare("CREATE TABLE IF NOT EXISTS reports (card TEXT, sub TEXT, reason TEXT, note TEXT, at INTEGER, PRIMARY KEY (card, sub))"),
     ])
       // Added later: "original" (the author's own picture) or "repost" (someone else's, shared).
       // Fails harmlessly when the column is already there.
@@ -92,11 +98,12 @@ export async function galleryApi(request, env, url, h) {
     return json({ items: rows.results || [] });
   }
 
-  let m = path.match(/^\/api\/public\/([A-Za-z0-9]+)(?:\/(bg|fg|vote))?$/);
+  let m = path.match(/^\/api\/public\/([A-Za-z0-9]+)(?:\/(bg|fg|vote|report))?$/);
   if (m && PUB_ID.test(m[1])) {
     const id = m[1];
     if (m[2] === "bg" || m[2] === "fg") return picture(env, id, m[2]);
     if (m[2] === "vote" && method === "POST") return vote(request, env, id, h);
+    if (m[2] === "report" && method === "POST") return report(request, env, id, h);
     if (!m[2] && method === "GET") return one(request, env, id, h);
     if (!m[2] && method === "DELETE") return takeDown(request, env, id, h, false);
   }
@@ -104,13 +111,28 @@ export async function galleryApi(request, env, url, h) {
   if (path === "/api/admin/public" && method === "GET") {
     const me = await whoami(request, env, h);
     if (!me || !me.admin) return json({ error: "只有管理員可以使用。" }, 403);
-    const status = ["pending", "approved", "rejected"].includes(url.searchParams.get("status")) ? url.searchParams.get("status") : "pending";
+    const status = ["pending", "approved", "rejected", "reported"].includes(url.searchParams.get("status")) ? url.searchParams.get("status") : "pending";
     const rows = await env.DB.prepare(
-      "SELECT p.*, u.email AS owner_email FROM public_cards p LEFT JOIN users u ON u.sub = p.owner_sub WHERE p.status = ? ORDER BY p.created_at DESC LIMIT 200"
-    )
-      .bind(status)
-      .all();
-    return json({ items: (rows.results || []).map((r) => Object.assign(item(r), { ownerEmail: r.owner_email || "", status: r.status, note: r.note || "", createdAt: r.created_at })) });
+      "SELECT p.*, u.email AS owner_email, (SELECT COUNT(*) FROM reports r WHERE r.card = p.id) AS report_count FROM public_cards p LEFT JOIN users u ON u.sub = p.owner_sub " +
+        (status === "reported"
+          ? "WHERE p.status IN ('pending','approved') AND EXISTS (SELECT 1 FROM reports r WHERE r.card = p.id) ORDER BY report_count DESC, p.created_at DESC LIMIT 200"
+          : "WHERE p.status = ? ORDER BY p.created_at DESC LIMIT 200")
+    );
+    const results = ((status === "reported" ? await rows.all() : await rows.bind(status).all()).results || []);
+    // The reasons people gave, for the cards in this list.
+    const why = {};
+    const ids = results.filter((r) => r.report_count).map((r) => r.id);
+    if (ids.length) {
+      const rep = await env.DB.prepare(`SELECT card, reason, note FROM reports WHERE card IN (${ids.map(() => "?").join(",")}) ORDER BY at DESC`)
+        .bind(...ids)
+        .all();
+      (rep.results || []).forEach((x) => (why[x.card] = why[x.card] || []).push({ reason: x.reason, note: x.note || "" }));
+    }
+    return json({
+      items: results.map((r) =>
+        Object.assign(item(r), { ownerEmail: r.owner_email || "", status: r.status, note: r.note || "", createdAt: r.created_at, reports: why[r.id] || [] })
+      ),
+    });
   }
   m = path.match(/^\/api\/admin\/public\/([A-Za-z0-9]+)$/);
   if (m && PUB_ID.test(m[1]) && method === "POST") {
@@ -120,7 +142,11 @@ export async function galleryApi(request, env, url, h) {
     const action = body && body.action;
     const note = String((body && body.note) || "").slice(0, 200);
     if (action === "approve") {
-      await env.DB.prepare("UPDATE public_cards SET status = 'approved', reviewed_at = ?, note = ? WHERE id = ?").bind(Date.now(), note, m[1]).run();
+      // Approving (again) means the card stays: its reports are dealt with.
+      await env.DB.batch([
+        env.DB.prepare("UPDATE public_cards SET status = 'approved', reviewed_at = COALESCE(NULLIF(reviewed_at, 0), ?), note = ? WHERE id = ?").bind(Date.now(), note, m[1]),
+        env.DB.prepare("DELETE FROM reports WHERE card = ?").bind(m[1]),
+      ]);
       return json({ ok: true });
     }
     if (action === "reject") {
@@ -327,6 +353,35 @@ async function vote(request, env, id, h) {
   return h.json({ likes: c.likes, dislikes: c.dislikes, myVote: value });
 }
 
+async function report(request, env, id, h) {
+  const me = await whoami(request, env, h);
+  if (!me) return h.json({ error: "請先用 Google 登入。", code: "signin" }, 401);
+  const r = await env.DB.prepare("SELECT owner_sub, status FROM public_cards WHERE id = ?").bind(id).first();
+  if (!r || r.status !== "approved") return h.json({ error: "找不到這張公開的卡片，可能已經下架。" }, 404);
+  if (r.owner_sub === me.sub) return h.json({ error: "不能檢舉自己的卡片。" }, 400);
+  const body = await readJson(request);
+  const reason = body && REPORT_REASONS.includes(body.reason) ? body.reason : "";
+  if (!reason) return h.json({ error: "請選擇檢舉的原因。" }, 400);
+  const note = String((body && body.note) || "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .trim()
+    .slice(0, 300);
+  // One report per person per card; reporting again updates it.
+  await env.DB.prepare(
+    "INSERT INTO reports (card, sub, reason, note, at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (card, sub) DO UPDATE SET reason = excluded.reason, note = excluded.note, at = excluded.at"
+  )
+    .bind(id, me.sub, reason, note, Date.now())
+    .run();
+  const n = (await env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE card = ?").bind(id).first()).n;
+  let hidden = false;
+  if (n >= REPORT_HIDE) {
+    // Off the gallery until the site owner looks at it again (it shows under 被檢舉).
+    await env.DB.prepare("UPDATE public_cards SET status = 'pending', note = ? WHERE id = ? AND status = 'approved'").bind(`被 ${n} 人檢舉，暫時下架等待重新審核`, id).run();
+    hidden = true;
+  }
+  return h.json({ ok: true, hidden });
+}
+
 async function takeDown(request, env, id, h, asAdmin) {
   const me = await whoami(request, env, h);
   if (!me) return h.json({ error: "請先用 Google 登入。", code: "signin" }, 401);
@@ -341,6 +396,7 @@ async function removeCard(env, id) {
   await env.DB.batch([
     env.DB.prepare("UPDATE public_cards SET status = 'removed' WHERE id = ?").bind(id),
     env.DB.prepare("DELETE FROM votes WHERE card = ?").bind(id),
+    env.DB.prepare("DELETE FROM reports WHERE card = ?").bind(id),
   ]);
   await Promise.all([env.SHARES.delete(`pub:${id}:bg`), env.SHARES.delete(`pub:${id}:fg`)]);
 }

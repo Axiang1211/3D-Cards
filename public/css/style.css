@@ -1108,6 +1108,7 @@ html.is-app .pub-source__legend { color: var(--a-muted); }
 .adm__meta { margin-top: 4px; font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; }
 .adm__meta.adm__warn { color: #b4542a; font-weight: 600; }
 html.is-app .adm__meta.adm__warn { color: #ffb38a; }
+.adm__reports { margin: 4px 0 0; padding-left: 18px; font-weight: 400; }
 .adm__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .adm__tool { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
 .adm__tool h2 { font-size: 17px; flex-basis: 100%; }
