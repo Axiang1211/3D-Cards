@@ -29,6 +29,7 @@
   const K_EMAIL = "hc:cloud-email";
   const K_DELETED = "hc:cloud-deleted";
   const K_LAST = "hc:cloud-last";
+  const K_TOKEN = "hc:cloud-token"; // the current access token (about an hour), so a reload needs no pop-up
 
   const ls = {
     get(k) {
@@ -47,6 +48,15 @@
   };
 
   let token = null; // { access, expires }
+  try {
+    const saved = JSON.parse(ls.get(K_TOKEN) || "null");
+    if (saved && saved.access && saved.expires > Date.now()) token = saved;
+  } catch (e) {}
+  function keepToken(t) {
+    token = t;
+    ls.set(K_TOKEN, t ? JSON.stringify(t) : null);
+    return t;
+  }
   let gisPromise = null;
 
   const isDesktop = () => !!window.HC_DESKTOP;
@@ -80,8 +90,7 @@
         scope: SCOPE,
         callback: (resp) => {
           if (resp.error) return reject(new Error(HC.t("Google 登入沒有完成。")));
-          token = { access: resp.access_token, expires: Date.now() + (resp.expires_in - 60) * 1000 };
-          resolve(token);
+          resolve(keepToken({ access: resp.access_token, expires: Date.now() + (resp.expires_in - 60) * 1000 }));
         },
         error_callback: () => reject(new Error(HC.t("Google 登入沒有完成。"))),
       });
@@ -116,8 +125,7 @@
       if (data.error === "invalid_grant") ls.set(K_REFRESH, null);
       return null;
     }
-    token = { access: data.access_token, expires: Date.now() + ((data.expires_in || 3600) - 60) * 1000 };
-    return token;
+    return keepToken({ access: data.access_token, expires: Date.now() + ((data.expires_in || 3600) - 60) * 1000 });
   }
 
   /** Opens the website in the user's browser to sign in, shows the check code, waits for the result. */
@@ -133,8 +141,7 @@
       const data = await workerPost("/api/google/claim", { id: start.id, secret: start.secret });
       if (data.access_token) {
         if (data.refresh_token) ls.set(K_REFRESH, data.refresh_token);
-        token = { access: data.access_token, expires: Date.now() + ((data.expires_in || 3600) - 60) * 1000 };
-        return token;
+        return keepToken({ access: data.access_token, expires: Date.now() + ((data.expires_in || 3600) - 60) * 1000 });
       }
       if (data.error === "expired") break;
       if (data.error && data.error !== "authorization_pending") throw new Error(HC.t("Google 登入沒有完成。"));
@@ -145,12 +152,17 @@
   /* ------------------------------------------------------------------ */
   /* Drive                                                               */
   /* ------------------------------------------------------------------ */
-  async function getToken() {
+  /**
+   * A current access token. On the website, renewing it needs a Google pop-up, so that
+   * only happens when the person asked for something that needs it (interactive);
+   * otherwise this throws "signin". The desktop app renews quietly.
+   */
+  async function getToken({ interactive = false } = {}) {
     if (token && token.expires > Date.now()) return token.access;
     if (isDesktop()) {
       const t = await refreshDesktopToken();
       if (t) return t.access;
-    } else if (ls.get(K_ON)) {
+    } else if (ls.get(K_ON) && interactive) {
       try {
         const t = await webSignIn(false);
         return t.access;
@@ -160,10 +172,10 @@
   }
 
   async function drive(url, opts = {}) {
-    const access = await getToken();
+    const access = await getToken({ interactive: true });
     const res = await fetch(url, Object.assign({}, opts, { headers: Object.assign({ Authorization: "Bearer " + access }, opts.headers || {}) }));
     if (res.status === 401) {
-      token = null;
+      keepToken(null);
       throw new Error("signin");
     }
     if (!res.ok) throw new Error(HC.t("Google 雲端硬碟回應錯誤（{code}）。", { code: res.status }));
@@ -279,7 +291,7 @@
   async function signOut() {
     if (HC.account) HC.account.forget();
     const access = token && token.access;
-    token = null;
+    keepToken(null);
     ls.set(K_ON, null);
     ls.set(K_EMAIL, null);
     ls.set(K_LAST, null);
@@ -309,14 +321,22 @@
     },
     sync,
     signOut,
-    /** A current Google access token (signs in again quietly when it can). Throws "signin". */
+    /** A current Google access token; { interactive: true } may show Google's pop-up. Throws "signin". */
     token: getToken,
+    /** Whether a token is at hand without asking Google again. */
+    get ready() {
+      return isDesktop() ? !!ls.get(K_REFRESH) || !!(token && token.expires > Date.now()) : !!(token && token.expires > Date.now());
+    },
+    /** Load Google's sign-in script early, so the pop-up opens straight from the click. */
+    preload() {
+      if (!isDesktop() && this.available) loadGis().catch(() => {});
+    },
   };
 
   /* ------------------------------------------------------------------ */
   /* Dialog                                                              */
   /* ------------------------------------------------------------------ */
-  HC.openCloud = function (onChange, onClose) {
+  HC.openCloud = function (onChange, onClose, { start = false } = {}) {
     const dlg = h("dialog.share", { "aria-labelledby": "cloud-title" });
     const body = h("div.share__body");
     const close = () => dlg.close();
@@ -442,5 +462,6 @@
       );
     }
     render();
+    if (start && !HC.cloud.signedIn) signIn();
   };
 })();

@@ -120,17 +120,27 @@
     if (!HC.cloud || !HC.cloud.signedIn) return [];
     if (mineCache && !force) return mineCache;
     try {
-      mineCache = (await HC.account.call("GET", "/api/public/mine")).items || [];
+      // Background request: never asks you to sign in. null = can't tell right now.
+      mineCache = (await HC.account.call("GET", "/api/public/mine", null, { quiet: true })).items || [];
     } catch (e) {
-      mineCache = [];
+      return mineCache || null;
     }
     return mineCache;
   }
 
-  /** Where one of your cards stands: null, or { status, id, likes, note }. */
+  /** Where one of your cards stands: null, { status, id, likes, note }, or undefined when it can't be checked now. */
   async function statusOf(card, force) {
     const list = await mine(force);
+    if (!list) return undefined;
     return list.find((x) => x.card_id === card.id) || null;
+  }
+
+  /** The card remembers its public copy, for when the server can't be asked. */
+  function remember(card, pubId) {
+    if (card && card.id && (card.pubId || null) !== (pubId || null) && HC.store.patch) {
+      card.pubId = pubId || null;
+      HC.store.patch(card.id, { pubId: pubId || null }).catch(() => {});
+    }
   }
 
   /**
@@ -143,8 +153,13 @@
   async function lockOf(card, force) {
     if (!card) return null;
     if (card.fromPublic) return { reason: "copy", pubId: card.fromPublic };
-    const s = await statusOf(card, force).catch(() => null);
-    if (s && (s.status === "pending" || s.status === "approved")) return { reason: s.status, pubId: s.id };
+    const s = await statusOf(card, force).catch(() => undefined);
+    if (s === undefined) return card.pubId ? { reason: "approved", pubId: card.pubId } : null;
+    if (s && (s.status === "pending" || s.status === "approved")) {
+      remember(card, s.id);
+      return { reason: s.status, pubId: s.id };
+    }
+    remember(card, null);
     return null;
   }
 
@@ -172,6 +187,7 @@
 
   function statusText(s) {
     if (!s) return "";
+    if (s.unknown) return T("公開展廳：已送出");
     if (s.status === "pending") return T("公開展廳：審核中");
     if (s.status === "approved") return T("公開展廳：已公開，{n} 個讚", { n: s.likes || 0 });
     if (s.status === "rejected") return T("公開展廳：沒有通過審核") + (s.note ? T("（{note}）", { note: s.note }) : "");
@@ -212,7 +228,8 @@
         msg.textContent = T("正在上傳…");
         try {
           const payload = await HC.io.payload(card, { forUpload: true });
-          await HC.account.call("POST", "/api/public", { card: payload, cardId: card.id, source: repost.checked ? "repost" : "original" });
+          const r = await HC.account.call("POST", "/api/public", { card: payload, cardId: card.id, source: repost.checked ? "repost" : "original" });
+          remember(card, r.id);
           ok = true;
           dlg.close();
         } catch (err) {
@@ -236,7 +253,7 @@
     return done;
   }
 
-  async function withdraw(id) {
+  async function withdraw(id, card) {
     const ok = HC.appConfirm
       ? await HC.appConfirm({ title: T("從公開展廳下架？"), text: T("卡片會從公開展廳移除，讚和倒讚也會一起清除。你自己的卡片不受影響。"), ok: T("下架"), danger: true })
       : confirm(T("從公開展廳下架？"));
@@ -244,6 +261,7 @@
     try {
       await HC.account.call("DELETE", "/api/public/" + id);
       mineCache = null;
+      if (card) remember(card, null);
       HC.toast(T("已下架"));
       return true;
     } catch (e) {
@@ -258,7 +276,10 @@
     const btn = h("button." + (cls || "btn btn--light"), { type: "button" }, T("公開到展廳"));
     const wrap = h("div.pub-own", btn, line);
     async function sync() {
-      const s = await statusOf(card).catch(() => null);
+      let s = await statusOf(card).catch(() => undefined);
+      // Can't ask the server right now: go by what the card remembers.
+      if (s === undefined) s = card.pubId ? { status: "approved", id: card.pubId, unknown: true } : null;
+      else remember(card, s && (s.status === "pending" || s.status === "approved") ? s.id : null);
       line.hidden = !s;
       line.textContent = statusText(s);
       if (s && s.status === "approved") {
@@ -266,7 +287,7 @@
         btn.onclick = () => HC.go("#/p/" + s.id);
       } else if (s && s.status === "pending") {
         btn.textContent = T("取消送審");
-        btn.onclick = async () => (await withdraw(s.id)) && sync();
+        btn.onclick = async () => (await withdraw(s.id, card)) && sync();
       } else {
         btn.textContent = s && s.status === "rejected" ? T("修改後重新送審") : T("公開到展廳");
         btn.onclick = async () => (await submit(card)) && sync();
@@ -351,7 +372,7 @@
     }
 
     async function loadMine() {
-      const list = (await mine(true)).filter((x) => x.status !== "approved");
+      const list = ((await mine(true)) || []).filter((x) => x.status !== "approved");
       minePanel.hidden = !list.length;
       if (!list.length) return;
       minePanel.replaceChildren(
@@ -496,6 +517,12 @@
   /* Review (site owner)                                                 */
   /* ------------------------------------------------------------------ */
   HC.views.admin = async function (root) {
+    // This page needs signing in: ask, and go back if the answer is no.
+    if (HC.cloud && HC.cloud.available && !(HC.cloud.signedIn && HC.cloud.ready) && !(await HC.account.signIn())) {
+      if (history.length > 1) history.back();
+      else HC.go("#/");
+      return { title: T("審核") };
+    }
     const who = await HC.account.me(true);
     if (!who || !who.admin) {
       root.appendChild(

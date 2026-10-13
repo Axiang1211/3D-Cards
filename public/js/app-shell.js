@@ -219,14 +219,14 @@
     });
   };
 
-  HC.appConfirm = function ({ title, text, ok, danger }) {
+  HC.appConfirm = function ({ title, text, ok, cancel, danger }) {
     return new Promise((resolve) => {
       const dlg = h("dialog.share.confirm", { "aria-labelledby": "cf-title" });
       let answer = false;
       const okBtn = h("button.btn" + (danger ? ".btn--danger-solid" : ".btn--ink"), { type: "button", onclick: () => ((answer = true), dlg.close()) }, ok);
       dlg.append(
         h("div.share__head", h("h2.share__title", { id: "cf-title" }, title)),
-        h("div.share__body", text ? h("p.share__note", text) : null, h("div.share__actions.confirm__actions", h("button.btn.btn--quiet", { type: "button", onclick: () => dlg.close() }, T("取消")), okBtn))
+        h("div.share__body", text ? h("p.share__note", text) : null, h("div.share__actions.confirm__actions", h("button.btn.btn--quiet", { type: "button", onclick: () => dlg.close() }, cancel || T("取消")), okBtn))
       );
       dlg.addEventListener("close", () => {
         dlg.remove();

@@ -6,7 +6,8 @@
  *
  *   HC.account.me()              { uid, name, admin } or null (not signed in)
  *   HC.account.call(m, path, b)  API call with your sign-in
- *   HC.account.signIn()          asks you to sign in if needed; true when signed in
+ *   HC.account.signIn()          when an action needs it: "this needs signing in, sign in?"
+ *                                then Google; true when signed in, false if you said no
  *   HC.account.ensureName()      asks for a public name if you have none
  *   HC.account.markText()        "name #uid", or "unknown user"
  *   HC.account.markFor(blob)     the watermark a photo should carry when uploaded
@@ -18,17 +19,43 @@
   const h = (...a) => HC.h(...a);
   const T = (s, p) => HC.t(s, p);
 
-  let meCache = null; // { at, value }
+  // Your profile, kept between visits so pages (and watermarks) know you without asking Google.
+  const K_ME = "hc:me";
+  let meCache = null; // { at, value, email }
+  try {
+    const saved = JSON.parse(localStorage.getItem(K_ME) || "null");
+    if (saved && saved.value) meCache = saved;
+  } catch (e) {}
+  function keepMe(value) {
+    meCache = value ? { at: Date.now(), value, email: (HC.cloud && HC.cloud.email) || "" } : null;
+    try {
+      if (meCache) localStorage.setItem(K_ME, JSON.stringify(meCache));
+      else localStorage.removeItem(K_ME);
+    } catch (e) {}
+  }
+  const cachedMe = () => (meCache && HC.cloud && HC.cloud.signedIn && (!meCache.email || meCache.email === HC.cloud.email) ? meCache.value : null);
 
   const api = () => (HC.share ? HC.share.apiBase() : location.origin);
 
-  async function call(method, path, body, { auth = true, optional = false } = {}) {
+  /**
+   * optional: works signed out too; sends your sign-in only if it's at hand.
+   * quiet:    needs your sign-in, but never asks for it (background requests); fails with code "signin".
+   * otherwise the person asked for this, so an expired sign-in gets the "sign in?" question.
+   */
+  async function call(method, path, body, { auth = true, optional = false, quiet = false } = {}) {
     const headers = { "Content-Type": "application/json" };
     if (auth && HC.cloud && HC.cloud.signedIn) {
+      let access = null;
       try {
-        headers.Authorization = "Bearer " + (await HC.cloud.token());
+        access = await HC.cloud.token();
       } catch (e) {
-        if (!optional) throw new Error(T("登入已過期，請重新用 Google 登入。"));
+        if (!optional && !quiet && (await signIn())) access = await HC.cloud.token().catch(() => null);
+      }
+      if (access) headers.Authorization = "Bearer " + access;
+      else if (!optional) {
+        const err = new Error(T("請先用 Google 登入。"));
+        err.code = "signin";
+        throw err;
       }
     }
     let res;
@@ -46,39 +73,86 @@
     return data;
   }
 
+  /** Your profile, or null. Never asks you to sign in; uses the saved copy when Google can't be asked quietly. */
   async function me(force) {
     if (!HC.cloud || !HC.cloud.signedIn) return null;
-    if (!force && meCache && Date.now() - meCache.at < 5 * 60 * 1000) return meCache.value;
+    const saved = cachedMe();
+    if (!force && saved && Date.now() - meCache.at < 5 * 60 * 1000) return saved;
     try {
-      const value = await call("GET", "/api/me");
-      meCache = { at: Date.now(), value };
+      const value = await call("GET", "/api/me", null, { quiet: true });
+      keepMe(value);
       return value;
     } catch (e) {
-      return null;
+      return e.code === "signin" ? saved : saved || null;
     }
   }
 
-  /** Signs you in with Google (same as cloud sync). Resolves true once signed in. */
+  /** "This needs signing in. Sign in?" — resolves true when you said yes and finished. */
+  function ask() {
+    if (HC.cloud.preload) HC.cloud.preload();
+    const opts = { title: T("需要登入"), text: T("此操作需要登入，是否登入？"), ok: T("是"), cancel: T("否") };
+    if (HC.appConfirm) return HC.appConfirm(opts);
+    return new Promise((resolve) => {
+      const dlg = h("dialog.share.confirm", { "aria-labelledby": "si-title" });
+      let answer = false;
+      const yes = h("button.btn.btn--ink", { type: "button", onclick: () => ((answer = true), dlg.close()) }, opts.ok);
+      dlg.append(
+        h("div.share__head", h("h2.share__title", { id: "si-title" }, opts.title)),
+        h("div.share__body", h("p.share__note", opts.text), h("div.share__actions.confirm__actions", h("button.btn.btn--quiet", { type: "button", onclick: () => dlg.close() }, opts.cancel), yes))
+      );
+      dlg.addEventListener("close", () => {
+        dlg.remove();
+        resolve(answer);
+      });
+      document.body.appendChild(dlg);
+      dlg.showModal();
+      yes.focus();
+    });
+  }
+
+  /**
+   * For actions that need you signed in. Signed in already: true, without asking.
+   * Otherwise asks first; "yes" goes on to Google, "no" resolves false.
+   */
+  let asking = null;
   function signIn() {
-    if (HC.cloud && HC.cloud.signedIn) return Promise.resolve(true);
     if (!HC.cloud || !HC.cloud.available) {
       HC.toast(T("這個版本沒有開啟 Google 登入。"), "error");
       return Promise.resolve(false);
     }
-    HC.toast(T("請先用 Google 登入。"));
-    return new Promise((resolve) => {
-      let done = false;
-      HC.openCloud(() => {
-        if (!done && HC.cloud.signedIn) {
-          done = true;
-          meCache = null;
-          resolve(true);
+    if (HC.cloud.signedIn && HC.cloud.ready) return Promise.resolve(true);
+    if (asking) return asking;
+    asking = (async () => {
+      if (!(await ask())) return false;
+      // Signed in before, only the sign-in ran out: Google's pop-up, straight from the click.
+      if (HC.cloud.signedIn) {
+        try {
+          await HC.cloud.token({ interactive: true });
+          return true;
+        } catch (e) {
+          HC.toast(T("Google 登入沒有完成。"), "error");
+          return false;
         }
-        if (HC.appShell) HC.appShell.refreshSync();
-      }, () => {
-        if (!done) resolve(!!HC.cloud.signedIn);
+      }
+      return new Promise((resolve) => {
+        let done = false;
+        HC.openCloud(
+          () => {
+            if (!done && HC.cloud.signedIn) {
+              done = true;
+              keepMe(null);
+              resolve(true);
+            }
+            if (HC.appShell) HC.appShell.refreshSync();
+          },
+          () => {
+            if (!done) resolve(!!HC.cloud.signedIn);
+          },
+          { start: true }
+        );
       });
-    });
+    })().finally(() => (asking = null));
+    return asking;
   }
 
   /** Asks for a public name (shown in the public gallery) if you have none. Resolves the profile, or null. */
@@ -102,7 +176,7 @@
         e.preventDefault();
         try {
           const v = await call("POST", "/api/me", { name: input.value });
-          meCache = { at: Date.now(), value: v };
+          keepMe(v);
           result = v;
           dlg.close();
         } catch (err) {
@@ -159,7 +233,7 @@
     markFor,
     adoptMark,
     forget() {
-      meCache = null;
+      keepMe(null);
     },
   };
 })();
