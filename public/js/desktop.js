@@ -1,6 +1,6 @@
 /*
  * desktop.js
- * Only active inside the Windows app (Tauri). On the website it does nothing.
+ * Only active inside the Tauri app. On the website it does nothing.
  *
  *  - window.HC_DESKTOP tells the rest of the site it runs in the app
  *  - links to other sites open in the normal browser
@@ -58,7 +58,16 @@
   }
 
   const ANDROID = /Android/i.test(navigator.userAgent);
+  const MAC = /Macintosh/i.test(navigator.userAgent);
+  function hasMacPackage(release) {
+    return (release.assets || []).some((x) =>
+      /\.(?:dmg|app\.(?:tar\.gz|tgz|zip))$/i.test(x.name) ||
+      (/(?:^|[-_.\s])(?:macos|mac|darwin|osx)(?:[-_.\s]|$)/i.test(x.name) && /\.(?:zip|tar\.gz|tgz)$/i.test(x.name))
+    );
+  }
+
   function setupFor(release) {
+    if (MAC) return release.html_url || RELEASE_PAGE;
     const want = ANDROID ? /\.apk$/i : /setup\.exe$/i;
     const asset = (release.assets || []).find((x) => want.test(x.name));
     return asset ? asset.browser_download_url : RELEASE_PAGE;
@@ -82,17 +91,22 @@
     const later = h("button.btn.btn--quiet", { type: "button", onclick: close }, HC.t("稍後再說"));
     body.append(
       h("p.share__note", HC.t("3D Cards {latest} 已經推出，你目前使用的是 {current}。", { latest, current })),
-      h("p.share__note", HC.t("更新後才能使用新功能。不更新也可以繼續使用目前的版本。")),
+      h("p.share__note", HC.t("更新後才能使用新功能。不更新也可以繼續使用目前的版本。"))
+    );
+    if (MAC) body.append(h("p.share__note", HC.t("請依照你的 Mac 晶片，選擇 Apple Silicon 或 Intel 的安裝包。")));
+    body.append(
       h("div.share__actions", go, later),
       h("label.check", skip, h("span", HC.t("這個版本不再提醒")))
     );
     go.addEventListener("click", () => {
       openUrl(setupFor(release)).catch(() => openUrl(RELEASE_PAGE).catch(() => {}));
       body.replaceChildren(
-        h("p.share__note", HC.t("新版安裝檔正在你的瀏覽器裡下載。")),
+        h("p.share__note", HC.t(MAC ? "已在瀏覽器開啟新版發布頁面。" : "新版安裝檔正在你的瀏覽器裡下載。")),
         h(
           "p.share__note",
-          ANDROID
+          MAC
+            ? HC.t("請選擇適合你的 Mac 的 .dmg 或 .app 壓縮檔。下載後先關閉 3D Cards，再安裝新版。")
+            : ANDROID
             ? HC.t("下載完成後，打開 3D-Cards.apk 安裝，就會更新成新版本。你做過的卡片都會保留。")
             : HC.t("下載完成後，先關閉 3D Cards，再執行 3D-Cards-Setup.exe，就會更新成新版本。你做過的卡片都會保留。")
         ),
@@ -122,6 +136,10 @@
       release = await res.json();
     } catch (e) {
       if (manual) HC.toast(HC.t("現在無法連上 GitHub 檢查更新，請確認網路後再試。"), "error");
+      return;
+    }
+    if (MAC && !hasMacPackage(release)) {
+      if (manual) HC.toast(HC.t("目前尚無 Mac 版安裝包。你可以從原始碼重新編譯 Mac 版。"));
       return;
     }
     const latest = String(release.tag_name || "").replace(/^v/, "");
