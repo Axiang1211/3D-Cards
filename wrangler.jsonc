@@ -2,7 +2,7 @@
   // 3D Cards on Cloudflare Workers.
   // The Worker name must match the project name in the Cloudflare dashboard.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "holo-cards",
+  "name": "3d-cards",
   "main": "src/worker.js",
   "compatibility_date": "2026-10-01",
   "assets": {
@@ -19,6 +19,8 @@
   "d1_databases": [{ "binding": "DB" }],
   // Public ID of the Google "Web application" client (same as googleClientId in public/js/config.js).
   // Its secret is set in Cloudflare as the secret GOOGLE_WEB_CLIENT_SECRET.
+  // Keep variables added in the Cloudflare dashboard (they are not in this file).
+  "keep_vars": true,
   "vars": {
     "GOOGLE_WEB_CLIENT_ID": "210055593962-3ajro5cogq75030114aqmh737itftgcl.apps.googleusercontent.com"
   }
