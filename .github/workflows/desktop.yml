@@ -142,13 +142,16 @@ jobs:
             exit "$status"
           fi
           set -e
-          bundle=src-tauri/target/universal-apple-darwin/release/bundle
-          lipo -info "$bundle/macos/3D Cards.app/Contents/MacOS/three-d-cards"
-          codesign --verify --deep --strict "$bundle/macos/3D Cards.app"
-          codesign -dv "$bundle/macos/3D Cards.app" 2>&1 | grep -E "Identifier|Signature|TeamIdentifier"
-          dmg=$(ls "$bundle"/dmg/*.dmg | head -n 1)
+          dmg=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -n 1)
           cp "$dmg" ../3D-Cards.dmg
           ls -la ../3D-Cards.dmg
+          # Check the app people get: inside the .dmg (the build removes its own copy of the .app).
+          mnt=$(mktemp -d)
+          hdiutil attach ../3D-Cards.dmg -nobrowse -readonly -mountpoint "$mnt" >/dev/null
+          lipo -info "$mnt/3D Cards.app/Contents/MacOS/three-d-cards"
+          codesign --verify --deep --strict "$mnt/3D Cards.app"
+          codesign -dv "$mnt/3D Cards.app" 2>&1 | grep -E "Identifier|Signature|TeamIdentifier"
+          hdiutil detach "$mnt" >/dev/null
 
       - name: Publish DMG
         env:
