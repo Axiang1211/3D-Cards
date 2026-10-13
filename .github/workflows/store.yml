@@ -1,0 +1,153 @@
+# Builds the Microsoft Store version of the Windows app (3D-Cards-Store.msix).
+#
+# There are two Windows apps:
+#   - 3D-Cards-Setup.exe from 「建置 App」: every release; the app offers each update itself.
+#   - Microsoft Store: only when you run this workflow and upload the result in Partner Center.
+#     The Store then updates everyone who installed it from the Store.
+#
+# How to use (no command line needed):
+#   GitHub → Actions → 「建置 Microsoft Store 版」 → Run workflow → Run workflow
+#   (leave the version empty for the newest release). When it's done, open the run, download
+#   「3D-Cards-Store」 under Artifacts, unzip it and upload 3D-Cards-Store.msix in Partner Center.
+# The package is built from the same code as that release's 3D-Cards-Setup.exe.
+
+name: 建置 Microsoft Store 版
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "要送到 Store 的版本（留空 = 最新的 Release）"
+        required: false
+  push:
+    paths: [".github/workflows/store.yml", "desktop/msix/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  store:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Pick the version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          v="${INPUT_VERSION#v}"
+          if [ -z "$v" ]; then
+            v=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+            v="${v#v}"
+          fi
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::版本號要寫成三段數字，例如 1.3.2"
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            # Same code as that release's 3D-Cards-Setup.exe.
+            if ! git checkout -q "v$v" 2>/dev/null || [ ! -f desktop/msix/AppxManifest.xml ]; then
+              echo "::error::找不到 v$v 的程式，或那個版本還沒有 Store 設定。請先用「建置 App」發布新版本，再建置 Store 版。"
+              exit 1
+            fi
+          fi
+          echo "Store version: $v.0 ($(git rev-parse --short HEAD))"
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Build the app
+        working-directory: desktop
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund
+          node copy-web.js
+          npx tauri build --no-bundle --config "{\"version\":\"$VERSION\"}"
+          ls -la src-tauri/target/release/three-d-cards.exe
+
+      - name: Make the Store package
+        shell: pwsh
+        run: |
+          $kits = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+          $makeappx = (Get-ChildItem "$kits\10.*\x64\makeappx.exe" | Sort-Object FullName | Select-Object -Last 1).FullName
+          $dir = "$env:RUNNER_TEMP\msix"
+          New-Item -ItemType Directory "$dir\Assets" -Force | Out-Null
+          Copy-Item desktop\src-tauri\target\release\three-d-cards.exe $dir
+          Copy-Item desktop\msix\Assets\* "$dir\Assets"
+          $manifest = (Get-Content desktop\msix\AppxManifest.xml -Raw).Replace('Version="VERSION"', "Version=`"$env:VERSION.0`"")
+          Set-Content "$dir\AppxManifest.xml" $manifest -Encoding utf8
+          & $makeappx pack /d $dir /p 3D-Cards-Store.msix /o
+          if ($LASTEXITCODE) { exit 1 }
+          Get-Item 3D-Cards-Store.msix | Format-List Name, Length
+
+      # Partner Center gets the unsigned package (the Store signs it). To try it here, a copy is
+      # signed with a throwaway certificate, installed, opened, and given a .3dcard file.
+      - name: Install and open a test copy
+        shell: pwsh
+        run: |
+          $kits = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+          $signtool = (Get-ChildItem "$kits\10.*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1).FullName
+          $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=969B6364-C304-4C13-8FBE-F2CC57460EC1" `
+            -KeyUsage DigitalSignature -CertStoreLocation Cert:\CurrentUser\My `
+            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+          Export-Certificate -Cert $cert -FilePath "$env:RUNNER_TEMP\test.cer" | Out-Null
+          Import-Certificate -FilePath "$env:RUNNER_TEMP\test.cer" -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+          Copy-Item 3D-Cards-Store.msix "$env:RUNNER_TEMP\test.msix"
+          & $signtool sign /fd SHA256 /sha1 $cert.Thumbprint "$env:RUNNER_TEMP\test.msix"
+          if ($LASTEXITCODE) { exit 1 }
+          Add-AppxPackage "$env:RUNNER_TEMP\test.msix"
+          $pkg = Get-AppxPackage Axiang.3DCards
+          if (-not $pkg) { Write-Host "::error::Store 安裝包裝不起來"; exit 1 }
+          $pkg | Format-List Name, Version, PackageFamilyName
+
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          New-Item -ItemType Directory shots -Force | Out-Null
+          function Shot($file) {
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("shots\$file")
+          }
+
+          Start-Process "shell:AppsFolder\$($pkg.PackageFamilyName)!App"
+          Start-Sleep 25
+          Shot "1-app.png"
+          if (-not (Get-Process three-d-cards -ErrorAction SilentlyContinue)) { Write-Host "::warning::Store 版打開後沒有在執行" }
+
+          $svg = [Convert]::ToBase64String([IO.File]::ReadAllBytes("public\gallery\ridgeline-bg.svg"))
+          $card = @{ format = "3d-cards"; version = 2; card = @{
+            title = "Store test"; subtitle = "Opened from File Explorer"; serial = "MS";
+            image = "data:image/svg+xml;base64,$svg"; foil = "rainbow"; area = "full"; frame = "silver" } }
+          [IO.File]::WriteAllText("$env:RUNNER_TEMP\Store-test.3dcard", ($card | ConvertTo-Json -Depth 4))
+          Start-Process "$env:RUNNER_TEMP\Store-test.3dcard"
+          Start-Sleep 10
+          Shot "2-card.png"
+
+      - name: Keep the Store package
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3D-Cards-Store
+          path: 3D-Cards-Store.msix
+          retention-days: 30
+
+      - name: Keep screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-screenshots
+          path: shots/
+          retention-days: 14

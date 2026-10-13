@@ -38,6 +38,15 @@ fn take_opened_cards(state: tauri::State<PendingCards>) -> Vec<String> {
     std::mem::take(&mut p.cards)
 }
 
+/// True for the Microsoft Store (MSIX) app, which Windows installs under WindowsApps.
+/// The Store updates that app itself, so the page does not offer 3D-Cards-Setup.exe.
+#[tauri::command]
+fn is_store_app() -> bool {
+    std::env::current_exe()
+        .map(|p| p.to_string_lossy().contains("\\WindowsApps\\"))
+        .unwrap_or(false)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
@@ -67,7 +76,7 @@ pub fn run() {
             ready: false,
             cards: card_files(&args),
         })))
-        .invoke_handler(tauri::generate_handler![take_opened_cards])
+        .invoke_handler(tauri::generate_handler![take_opened_cards, is_store_app])
         .build(tauri::generate_context!())
         .expect("failed to start 3D Cards");
 
