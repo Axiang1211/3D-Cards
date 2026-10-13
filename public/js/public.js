@@ -59,7 +59,11 @@
     return h(
       "p.pub-notice",
       T("展出的作品由使用者分享，版權屬於原作者。若有版權爭議，請聯繫我們刪除。"),
-      url ? [" ", h("a", { href: url, rel: "noopener", target: "_blank" }, T("聯繫刪除"))] : null
+      url
+        ? /^mailto:/i.test(url)
+          ? [" ", T("聯繫信箱："), h("a", { href: url }, decodeURIComponent(url.slice(7).split("?")[0]))]
+          : [" ", h("a", { href: url, rel: "noopener", target: "_blank" }, T("聯繫刪除"))]
+        : null
     );
   }
 

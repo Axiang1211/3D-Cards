@@ -358,6 +358,7 @@
   "關於": "About",
   "展出的作品由使用者分享，版權屬於原作者。若有版權爭議，請聯繫我們刪除。": "Cards here are shared by their makers, who own the rights. If you have a copyright concern, contact us and we'll take it down.",
   "聯繫刪除": "Request removal",
+  "聯繫信箱：": "Contact: ",
   "評價": "Rating",
   "讚（{n}）": "Like ({n})",
   "倒讚（{n}）": "Dislike ({n})",

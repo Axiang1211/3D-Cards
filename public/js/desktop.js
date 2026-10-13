@@ -35,6 +35,11 @@
       const a = e.target.closest && e.target.closest("a[href]");
       if (!a || a.hasAttribute("download")) return;
       const url = new URL(a.getAttribute("href"), location.href);
+      if (url.protocol === "mailto:") {
+        e.preventDefault();
+        openUrl(url.href).catch(() => {});
+        return;
+      }
       if (!/^https?:$/.test(url.protocol) || url.origin === location.origin) return;
       e.preventDefault();
       openUrl(url.href).catch(() => {});

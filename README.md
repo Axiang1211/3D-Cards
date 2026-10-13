@@ -138,7 +138,7 @@
 - 卡片頁會顯示審核狀態；審核中可以取消，公開後也可以隨時下架
 - **存到我的卡片**：喜歡的公開卡片可以存一份到自己的卡片
 
-展出的作品由使用者分享，版權屬於原作者。若有版權爭議，請到 [GitHub](https://github.com/Axiang1211/3D-Cards/issues) 聯繫刪除。
+展出的作品由使用者分享，版權屬於原作者。若有版權爭議，請寫信到 [axianggaming1211@gmail.com](mailto:axianggaming1211@gmail.com) 聯繫刪除。
 
 ### 隱形水印
 
