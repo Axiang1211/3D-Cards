@@ -39,6 +39,9 @@ window.HC_CONFIG = {
    */
   contactUrl: "mailto:axianggaming1211@gmail.com?subject=3D%20Cards%20%E5%85%AC%E9%96%8B%E5%B1%95%E5%BB%B3%E5%88%AA%E9%99%A4%E8%AB%8B%E6%B1%82",
 
+  /* The newest Mac app (DMG) on the Releases page. Leave empty to show the Mac app as "coming soon". */
+  dmgUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.dmg",
+
   /* The newest Android app (APK) on the Releases page. Leave empty to hide the links. */
   apkUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk",
 };

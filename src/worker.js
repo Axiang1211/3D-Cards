@@ -403,6 +403,7 @@ async function release(env) {
       out.date = d.published_at || "";
       for (const a of d.assets || []) {
         if (/setup\.exe$/i.test(a.name)) out.assets.windows = { size: a.size };
+        if (/\.dmg$/i.test(a.name)) out.assets.mac = { size: a.size };
         if (/\.apk$/i.test(a.name)) out.assets.android = { size: a.size };
       }
     }
@@ -418,8 +419,9 @@ async function release(env) {
         const n = +h.headers.get("Content-Length");
         return h.ok && n ? { size: n } : null;
       };
-      const [win, apk] = await Promise.all([size("3D-Cards-Setup.exe"), size("3D-Cards.apk")]);
+      const [win, dmg, apk] = await Promise.all([size("3D-Cards-Setup.exe"), size("3D-Cards.dmg"), size("3D-Cards.apk")]);
       if (win) out.assets.windows = win;
+      if (dmg) out.assets.mac = dmg;
       if (apk) out.assets.android = apk;
     } catch (e) {}
   }

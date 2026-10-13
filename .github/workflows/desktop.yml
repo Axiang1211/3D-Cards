@@ -1,12 +1,12 @@
-# Builds the Windows installer (3D-Cards-Setup.exe) and the Android app (3D-Cards.apk)
-# and publishes both on the Releases page.
+# Builds the Windows installer (3D-Cards-Setup.exe), the Mac app (3D-Cards.dmg) and the
+# Android app (3D-Cards.apk), all with the same version, and publishes them on the Releases page.
 #
 # How to use (no command line needed):
-#   GitHub → Actions → 「建置 App（Windows + Android）」 → Run workflow → enter a version → Run workflow.
+#   GitHub → Actions → 「建置 App（Windows + Mac + Android）」 → Run workflow → enter a version → Run workflow.
 # The version must be higher than the previous one (1.0.1 → 1.0.2 → 1.1.0 …).
 # Installed apps compare their version with the newest release on start-up and offer the update.
 
-name: 建置 App（Windows + Android）
+name: 建置 App（Windows + Mac + Android）
 
 on:
   workflow_dispatch:
@@ -80,9 +80,81 @@ jobs:
           else
             gh release create "$tag" 3D-Cards-Setup.exe \
               --title "3D Cards $VERSION" \
-              --notes "Windows：下載 **3D-Cards-Setup.exe** 並執行即可安裝或更新。Android：下載 **3D-Cards.apk** 安裝（要允許安裝不明來源的應用程式）。已安裝的 App 打開時會提示更新。" \
+              --notes "Windows：下載 **3D-Cards-Setup.exe** 並執行即可安裝或更新。Mac：下載 **3D-Cards.dmg**，打開後把 3D Cards 拖到「應用程式」資料夾。Android：下載 **3D-Cards.apk** 安裝（要允許安裝不明來源的應用程式）。已安裝的 App 打開時會提示更新。" \
               --latest
           fi
+
+  macos:
+    needs: windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Install
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      # One .dmg for every Mac: Apple silicon (M1 and later) and Intel.
+      - name: Build DMG
+        working-directory: desktop
+        env:
+          VERSION: ${{ inputs.version }}
+          # Optional: an Apple Developer ID removes the "unidentified developer" warning. See docs/維護說明.md.
+          SECRET_APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          SECRET_APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SECRET_APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          SECRET_APPLE_ID: ${{ secrets.APPLE_ID }}
+          SECRET_APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          SECRET_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            s="SECRET_$v"
+            if [ -n "${!s}" ]; then export "$v=${!s}"; fi
+          done
+          if [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            config="{\"version\":\"$VERSION\"}"
+          else
+            # No Apple Developer ID: sign ad hoc, which Apple silicon Macs need to run the app at all.
+            echo "::notice::沒有設定 Apple 開發者憑證，Mac 版用免費的臨時簽名。第一次打開時使用者要在「隱私權與安全性」按「仍要打開」。"
+            config="{\"version\":\"$VERSION\",\"bundle\":{\"macOS\":{\"signingIdentity\":\"-\"}}}"
+          fi
+          node copy-web.js
+          set +e
+          npx tauri build --bundles dmg --target universal-apple-darwin --config "$config" 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            msg=$(tail -n 60 build.log | sed -e 's/\x1b\[[0-9;]*m//g' -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Mac build::$msg"
+            exit "$status"
+          fi
+          set -e
+          bundle=src-tauri/target/universal-apple-darwin/release/bundle
+          lipo -info "$bundle/macos/3D Cards.app/Contents/MacOS/three-d-cards"
+          codesign --verify --deep --strict "$bundle/macos/3D Cards.app"
+          codesign -dv "$bundle/macos/3D Cards.app" 2>&1 | grep -E "Identifier|Signature|TeamIdentifier"
+          dmg=$(ls "$bundle"/dmg/*.dmg | head -n 1)
+          cp "$dmg" ../3D-Cards.dmg
+          ls -la ../3D-Cards.dmg
+
+      - name: Publish DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: gh release upload "v$VERSION" 3D-Cards.dmg --clobber
 
   android:
     needs: windows

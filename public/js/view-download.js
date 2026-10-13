@@ -58,8 +58,16 @@
         id: "mac",
         glyph: "laptop",
         name: "macOS",
-        needs: T("Mac 版還在準備中"),
-        open: false,
+        needs: cfg.dmgUrl ? T("macOS 10.15 以上，Apple 晶片和 Intel 都可以") : T("Mac 版還在準備中"),
+        open: !!cfg.dmgUrl,
+        href: cfg.dmgUrl,
+        file: T(".dmg 安裝檔"),
+        action: T("下載 Mac 版"),
+        steps: [
+          T("下載後打開 3D-Cards.dmg，把 3D Cards 拖到「應用程式」資料夾。"),
+          T("第一次打開時，如果出現「無法打開」或「無法驗證開發者」，到「系統設定」→「隱私權與安全性」，往下捲按「仍要打開」。這是因為程式沒有購買 Apple 的開發者簽章。"),
+          T("之後從「應用程式」或 Launchpad 打開 3D Cards。有新版本時，打開時會提示更新。"),
+        ],
         alt: T("現在可以用 Safari 或 Chrome 打開網站，或把網站安裝成 App，功能都一樣。"),
         altAction: { label: T("把網站安裝成 App"), run: () => pwa && pwa.howTo("desktop") },
       },
@@ -163,6 +171,7 @@
           const assets = {};
           (d.assets || []).forEach((a) => {
             if (/setup\.exe$/i.test(a.name)) assets.windows = { size: a.size };
+            if (/\.dmg$/i.test(a.name)) assets.mac = { size: a.size };
             if (/\.apk$/i.test(a.name)) assets.android = { size: a.size };
           });
           return { version: String(d.tag_name || "").replace(/^v/, ""), date: d.published_at, assets };
@@ -177,7 +186,7 @@
         version.textContent = date
           ? T("最新版本 {v}，{y} 年 {m} 月 {d} 日發布", { v: d.version, y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() })
           : T("最新版本 {v}", { v: d.version });
-        ["windows", "android"].forEach((k) => {
+        ["windows", "mac", "android"].forEach((k) => {
           const a = d.assets && d.assets[k];
           if (a && sizes[k] && sizes[k].textContent) sizes[k].textContent += T("，約 {s}", { s: mb(a.size) });
         });

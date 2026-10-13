@@ -1,6 +1,6 @@
 /*
  * desktop.js
- * Only active inside the Windows app (Tauri). On the website it does nothing.
+ * Only active inside the Windows, Mac and Android apps (Tauri). On the website it does nothing.
  *
  *  - window.HC_DESKTOP tells the rest of the site it runs in the app
  *  - links to other sites open in the normal browser
@@ -58,8 +58,9 @@
   }
 
   const ANDROID = /Android/i.test(navigator.userAgent);
+  const MAC = !ANDROID && /Macintosh|Mac OS X/.test(navigator.userAgent);
   function setupFor(release) {
-    const want = ANDROID ? /\.apk$/i : /setup\.exe$/i;
+    const want = ANDROID ? /\.apk$/i : MAC ? /\.dmg$/i : /setup\.exe$/i;
     const asset = (release.assets || []).find((x) => want.test(x.name));
     return asset ? asset.browser_download_url : RELEASE_PAGE;
   }
@@ -94,6 +95,8 @@
           "p.share__note",
           ANDROID
             ? HC.t("下載完成後，打開 3D-Cards.apk 安裝，就會更新成新版本。你做過的卡片都會保留。")
+            : MAC
+            ? HC.t("下載完成後，先結束 3D Cards，再打開 3D-Cards.dmg，把 3D Cards 拖到「應用程式」資料夾並選擇「取代」，就會更新成新版本。你做過的卡片都會保留。")
             : HC.t("下載完成後，先關閉 3D Cards，再執行 3D-Cards-Setup.exe，就會更新成新版本。你做過的卡片都會保留。")
         ),
         h("div.share__actions", h("button.btn.btn--ink", { type: "button", onclick: () => dlg.close() }, HC.t("知道了")))
@@ -143,7 +146,7 @@
     checkForUpdates: () => checkForUpdates(true),
   };
 
-  /* .3dcard files double-clicked in Windows arrive here and are saved to My cards. */
+  /* .3dcard files double-clicked in Windows or the Mac Finder arrive here and are saved to My cards. */
   async function openCardFiles(texts) {
     let last = null;
     for (const text of texts || []) {

@@ -2,13 +2,14 @@
   "name": "3d-cards-desktop",
   "version": "1.0.0",
   "private": true,
-  "description": "3D Cards 的 Windows 和 Android App（Tauri）",
+  "description": "3D Cards 的 Windows、Mac 和 Android App（Tauri）",
   "license": "MIT",
   "scripts": {
     "tauri": "tauri",
     "web": "node copy-web.js",
     "dev": "node copy-web.js && tauri dev",
-    "build": "node copy-web.js && tauri build --bundles nsis"
+    "build": "node copy-web.js && tauri build --bundles nsis",
+    "build:mac": "node copy-web.js && tauri build --bundles dmg --target universal-apple-darwin"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.0"
