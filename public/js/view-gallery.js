@@ -84,19 +84,27 @@
 
     /* Wall -------------------------------------------------------------- */
     const wall = h("section.exhibit", { "aria-labelledby": "exhibit-title" });
+    // Public gallery cards load in the background; until then they count as "…".
+    let pub = null;
+    let pubFailed = false;
+    let alive = true;
+    const pubCount = () => (pub ? String(pub.length) : "…");
     const filters = [
-      { id: "all", label: HC.t("全部"), count: own.length + gal.length },
-      { id: "gallery", label: HC.t("示範作品"), count: gal.length },
-      { id: "own", label: HC.t("我的卡片"), count: own.length },
+      { id: "all", label: HC.t("全部"), count: () => (pub ? String(own.length + gal.length + pub.length) : String(own.length + gal.length)) },
+      { id: "gallery", label: HC.t("示範"), count: () => String(gal.length) },
+      { id: "public", label: HC.t("公開"), count: pubCount },
+      { id: "own", label: HC.t("我的"), count: () => String(own.length) },
     ];
     if (!own.length && lastFilter === "own") lastFilter = "all";
     const seg = h("div.seg", { role: "radiogroup", "aria-label": HC.t("篩選卡片") });
+    const counts = {};
     filters.forEach((f) => {
+      counts[f.id] = h("span.seg__count", f.count());
       const b = h(
         "button.seg__btn",
         { type: "button", role: "radio", "aria-checked": String(f.id === lastFilter), dataset: { f: f.id } },
         f.label,
-        h("span.seg__count", String(f.count))
+        counts[f.id]
       );
       b.addEventListener("click", () => {
         lastFilter = f.id;
@@ -137,10 +145,23 @@
     wall.appendChild(grid);
     root.appendChild(wall);
 
+    const PUB_MAX = 24; // the rest is on the public gallery page
     function fill() {
       wallCards.splice(0).forEach((c) => c.destroy());
       grid.replaceChildren();
-      const list = lastFilter === "own" ? own : lastFilter === "gallery" ? gal : [...own, ...gal];
+      const pubList = (pub || []).slice(0, PUB_MAX);
+      const list = lastFilter === "own" ? own : lastFilter === "gallery" ? gal : lastFilter === "public" ? pubList : [...own, ...gal, ...pubList];
+      const more = (lastFilter === "public" || lastFilter === "all") && pub && pub.length > PUB_MAX;
+      if (lastFilter === "public" && !list.length) {
+        grid.appendChild(
+          h(
+            "li.wall__empty",
+            h("p", pub ? HC.t("還沒有公開的卡片。成為第一個分享的人吧！") : pubFailed ? HC.t("現在無法載入公開展廳，請稍後再試。") : HC.t("載入中…")),
+            pub ? h("a.btn.btn--ink", { href: "#/public" }, HC.t("前往公開展廳")) : null
+          )
+        );
+        return;
+      }
       if (!list.length) {
         grid.appendChild(
           h(
@@ -153,19 +174,61 @@
         return;
       }
       list.forEach((data) => {
+        const it = data._pub;
         const card = new HC.HoloCard(data, { maxTilt: 12 });
         wallCards.push(card);
-        const link = h("a.piece__link", { href: "#/card/" + data.id, "aria-label": HC.t("查看「{title}」", { title: data.title || HC.t("未命名卡片") }) }, card.el);
+        const link = h(
+          "a.piece__link",
+          { href: it ? "#/p/" + it.id : "#/card/" + data.id, "aria-label": HC.t("查看「{title}」", { title: data.title || HC.t("未命名卡片") }) },
+          card.el
+        );
         link.addEventListener("click", () => {
           lastScroll = window.scrollY;
-          card.el.style.viewTransitionName = "hc-focus";
+          if (!it) card.el.style.viewTransitionName = "hc-focus";
         });
-        grid.appendChild(
-          h("li.piece", data.own ? { dataset: { own: "" } } : null, link, placard(data), data.own ? h("span.piece__tag", HC.t("我的")) : null)
-        );
+        const tag = data.own ? h("span.piece__tag", HC.t("我的")) : it ? h("span.piece__tag.piece__tag--pub", HC.t("公開")) : null;
+        grid.appendChild(h("li.piece", data.own ? { dataset: { own: "" } } : null, link, it ? pubPlacard(it) : placard(data), tag));
       });
+      if (more) {
+        grid.appendChild(h("li.wall__more", h("a.btn.btn--line", { href: "#/public" }, HC.t("在公開展廳看全部 {n} 張", { n: pub.length }))));
+      }
     }
+
+    function pubPlacard(it) {
+      return h(
+        "div.placard",
+        h("p.placard__title", it.title || HC.t("未命名卡片")),
+        h("p.placard__meta.pub-meta", HC.pub.sourceTag(it), h("span", HC.t("來自 {name}", { name: it.author || "?" }))),
+        h("p.placard__meta", HC.t("{n} 個讚", { n: it.likes || 0 }))
+      );
+    }
+
     fill();
+
+    if (HC.pub && HC.account) {
+      HC.account
+        .call("GET", "/api/public?sort=hot", null, { optional: true })
+        .then((d) => {
+          pub = (d.items || []).map((it) => Object.assign(HC.pub.cardData(it), { _pub: it }));
+        })
+        .catch(() => {
+          pubFailed = true;
+          pub = null;
+        })
+        .then(() => {
+          if (!alive) return;
+          filters.forEach((f) => (counts[f.id].textContent = f.count()));
+          if (pubFailed) counts.public.textContent = "–";
+          if (lastFilter === "public" || (lastFilter === "all" && pub && pub.length)) {
+            // Keep the reader's place when the wall grows under them.
+            const y = window.scrollY;
+            fill();
+            window.scrollTo(0, y);
+          }
+        });
+    } else {
+      counts.public.closest(".seg__btn").hidden = true;
+    }
 
     if (own.length && !HC.store.persistent) {
       HC.toast(HC.t("這個瀏覽器不允許儲存資料，做好的卡片在關閉分頁後會消失。"));
@@ -179,6 +242,7 @@
         if (restore) requestAnimationFrame(() => window.scrollTo(0, restore));
       },
       destroy() {
+        alive = false;
         cards.concat(wallCards).forEach((c) => c.destroy());
         cleanups.forEach((f) => f && f());
       },

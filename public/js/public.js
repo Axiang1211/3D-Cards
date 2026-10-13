@@ -54,6 +54,16 @@
     return s;
   }
 
+  /** 原創 / 轉載 label. */
+  function sourceTag(it) {
+    const repost = it.source === "repost";
+    return h(
+      "span.pub-tag" + (repost ? ".pub-tag--repost" : ".pub-tag--original"),
+      { title: repost ? T("作者分享的公開照片，版權方要求時會下架。") : T("作者自己拍攝或創作的照片。") },
+      repost ? T("轉載") : T("原創")
+    );
+  }
+
   function notice() {
     const url = CFG().contactUrl;
     return h(
@@ -138,16 +148,23 @@
     if (!who || !who.name) return;
     const done = await new Promise((resolve) => {
       const dlg = h("dialog.share", { "aria-labelledby": "pub-title" });
-      const agree = h("input", { type: "checkbox" });
+      // Either statement is enough; the choice is shown on the card as 原創 / 轉載.
+      const original = h("input", { type: "radio", name: "pub-source", value: "original" });
+      const repost = h("input", { type: "radio", name: "pub-source", value: "repost" });
       const go = h("button.btn.btn--ink", { type: "submit", disabled: true }, T("送出審核"));
       const msg = h("p.share__note", { role: "status" });
-      agree.addEventListener("change", () => (go.disabled = !agree.checked));
+      [original, repost].forEach((r) => r.addEventListener("change", () => (go.disabled = !(original.checked || repost.checked))));
       let ok = false;
       const form = h(
         "form.share__body",
         h("p.share__note", T("「{title}」會以「{name}」的名義送出。管理員審核通過後，所有人都能在公開展廳看到它，並按讚或倒讚。", { title: card.title || T("未命名卡片"), name: who.name })),
         h("p.share__note", T("照片會加上看不見的浮水印，記錄是誰上傳的。")),
-        h("label.check", agree, h("span", T("這張卡片的照片是我拍攝或創作的，或我有權公開它，沒有侵犯別人的版權。"))),
+        h(
+          "fieldset.pub-source",
+          h("legend.pub-source__legend", T("選一個符合的說明：")),
+          h("label.check.check--top", original, h("span", h("b.pub-tag.pub-tag--original", T("原創")), T("這張卡片的照片是我拍攝或創作的，或我有權公開它，沒有侵犯別人的版權。"))),
+          h("label.check.check--top", repost, h("span", h("b.pub-tag.pub-tag--repost", T("轉載")), T("這張卡片是我分享的公開照片。若版權方要求下架，我願意接受下架要求。")))
+        ),
         msg,
         h("div.share__actions", go, h("button.btn.btn--quiet", { type: "button", onclick: () => dlg.close() }, T("取消")))
       );
@@ -158,7 +175,7 @@
         msg.textContent = T("正在上傳…");
         try {
           const payload = await HC.io.payload(card, { forUpload: true });
-          await HC.account.call("POST", "/api/public", { card: payload, cardId: card.id });
+          await HC.account.call("POST", "/api/public", { card: payload, cardId: card.id, source: repost.checked ? "repost" : "original" });
           ok = true;
           dlg.close();
         } catch (err) {
@@ -223,7 +240,7 @@
     return wrap;
   }
 
-  HC.pub = { submit, mine, statusOf, ownCardPanel, cardData, votes, notice, dateText };
+  HC.pub = { submit, mine, statusOf, ownCardPanel, cardData, votes, notice, dateText, sourceTag };
 
   /* ------------------------------------------------------------------ */
   /* Gallery page                                                        */
@@ -287,7 +304,7 @@
             h(
               "div.placard",
               h("p.placard__title", it.title || T("未命名卡片")),
-              h("p.placard__meta", T("來自 {name}", { name: it.author || "?" })),
+              h("p.placard__meta.pub-meta", sourceTag(it), h("span", T("來自 {name}", { name: it.author || "?" }))),
               h("p.placard__meta.pub-meta", likes, h("span", dateText(it.date)))
             )
           )
@@ -435,8 +452,9 @@
           it.status && it.status !== "approved" ? h("p.placard__from", it.status === "pending" ? T("審核中，只有你和管理員看得到") : T("沒有通過審核")) : null,
           h("h1.placard__title", it.title || T("未命名卡片")),
           it.subtitle ? h("p.placard__sub", it.subtitle) : null,
-          h("p.placard__meta", T("來自 {name}", { name: it.author || "?" })),
+          h("p.placard__meta.pub-meta", sourceTag(it), h("span", T("來自 {name}", { name: it.author || "?" }))),
           h("p.placard__meta", T("{date}公開", { date: dateText(it.date) })),
+          it.source === "repost" ? h("p.placard__meta.pub-repost-note", T("這是作者分享的公開照片，版權屬於原作者。版權方要求時會下架。")) : null,
           it.status === "approved" ? votes(it) : null
         ),
         h("div.room__tools", h("div.room__actions", tools), takeDown ? h("div.room__own", takeDown) : null),
@@ -555,6 +573,7 @@
               "div.adm__info",
               h("h2", it.title || T("未命名卡片")),
               it.subtitle ? h("p.adm__meta", it.subtitle) : null,
+              h("p.adm__meta", sourceTag(it), " ", it.source === "repost" ? T("作者表示是分享的公開照片，願意接受下架要求") : T("作者表示是自己拍攝或創作的")),
               h("p.adm__meta", T("作者：{name}（{email}）", { name: it.author, email: it.ownerEmail || "?" })),
               h("p.adm__meta", T("送出：{date}", { date: dateText(it.createdAt) })),
               wm,

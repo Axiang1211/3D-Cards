@@ -324,6 +324,8 @@ body[data-view="detail"] .site-foot { color: var(--room-muted); border-color: va
   color: var(--muted);
 }
 .wall__warn { font-size: 13px; }
+.piece__tag--pub { background: rgba(28, 24, 48, .82); color: #fff; }
+.wall__more { grid-column: 1 / -1; display: flex; justify-content: center; }
 
 /* Museum wall label under each card */
 .placard { margin-top: 22px; }
@@ -1019,6 +1021,25 @@ body[data-view="detail"] .lang-switch button[aria-pressed="true"] { background: 
 .pub-likes { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .pub-likes .vote__ico { width: 15px; height: 15px; }
 .pub-empty { padding: 48px 0; color: var(--muted); }
+/* 原創 / 轉載 */
+.pub-tag {
+  display: inline-flex; align-items: center; flex: none;
+  padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; line-height: 1.6; letter-spacing: .02em; white-space: nowrap;
+}
+.pub-tag--original { color: #2f6f4f; background: rgba(47, 160, 100, .14); }
+.pub-tag--repost { color: #8a5a12; background: rgba(214, 150, 40, .18); }
+.room .pub-tag--original, html.is-app .pub-tag--original { color: #8fdcb2; background: rgba(80, 200, 140, .16); }
+.room .pub-tag--repost, html.is-app .pub-tag--repost { color: #f2c779; background: rgba(240, 180, 70, .16); }
+.share .pub-tag { margin-right: 8px; vertical-align: 1px; }
+html.is-app .pub-source__legend { color: var(--a-muted); }
+.pub-repost-note { font-size: 13px; color: var(--room-muted); }
+.pub-meta .pub-tag + span { margin-left: -6px; }
+.pub-source { border: 0; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.pub-source__legend { padding: 0; margin-bottom: 10px; font-size: 13.5px; color: var(--muted); }
+.check--top { align-items: flex-start; line-height: 1.6; }
+.check--top input { margin-top: 3px; flex: none; }
+.adm__meta .pub-tag { margin-right: 4px; }
 .pub-notice { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); max-width: 46em; }
 .pub-notice a { color: inherit; text-underline-offset: 3px; }
 .room .pub-notice { margin-top: 0; border-color: var(--room-rule); color: var(--room-muted); }

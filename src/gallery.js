@@ -10,7 +10,8 @@
  *   POST   /api/me                     { name } set my public name            (signed in)
  *   GET    /api/public?sort=hot|top|new list of approved cards
  *   GET    /api/public/mine            my submissions with their status       (signed in)
- *   POST   /api/public                 { card, cardId } submit for review     (signed in)
+ *   POST   /api/public                 { card, cardId, source } submit for review (signed in)
+ *                                      source: "original" (own picture) | "repost" (shared, taken down on request)
  *   GET    /api/public/:id             one card (approved, or yours / admin)
  *   GET    /api/public/:id/bg|fg       its pictures
  *   POST   /api/public/:id/vote        { value: 1 | -1 | 0 }                  (signed in)
@@ -45,7 +46,11 @@ function ready(env) {
       env.DB.prepare("CREATE INDEX IF NOT EXISTS public_cards_status ON public_cards (status, reviewed_at)"),
       env.DB.prepare("CREATE INDEX IF NOT EXISTS public_cards_owner ON public_cards (owner_sub)"),
       env.DB.prepare("CREATE TABLE IF NOT EXISTS votes (card TEXT, sub TEXT, value INTEGER, at INTEGER, PRIMARY KEY (card, sub))"),
-    ]).catch((e) => {
+    ])
+      // Added later: "original" (the author's own picture) or "repost" (someone else's, shared).
+      // Fails harmlessly when the column is already there.
+      .then(() => env.DB.prepare("ALTER TABLE public_cards ADD COLUMN source TEXT").run().catch(() => {}))
+      .catch((e) => {
       schemaReady = null;
       throw e;
     });
@@ -206,6 +211,7 @@ function item(r) {
     subtitle: r.subtitle,
     author: r.owner_name,
     authorUid: r.owner_uid,
+    source: r.source === "repost" ? "repost" : "original",
     likes: r.likes || 0,
     dislikes: r.dislikes || 0,
     date: r.reviewed_at || r.created_at,
@@ -266,6 +272,9 @@ async function submit(request, env, h) {
   if (checked.error) return h.json({ error: checked.error }, checked.status || 400);
   const card = checked.card;
   const cardId = String(body.cardId || "").slice(0, 40);
+  // Older apps only had the "my own picture" box.
+  const source = body.source === undefined ? "original" : body.source;
+  if (source !== "original" && source !== "repost") return h.json({ error: "請選擇這張卡片是原創還是轉載。" }, 400);
 
   const pending = await env.DB.prepare("SELECT COUNT(*) AS n FROM public_cards WHERE owner_sub = ? AND status = 'pending'").bind(me.sub).first();
   if (pending && pending.n >= MAX_PENDING) return h.json({ error: `你已經有 ${MAX_PENDING} 張卡片在等待審核，請等審核後再送出。` }, 429);
@@ -289,10 +298,10 @@ async function submit(request, env, h) {
   delete settings.image;
   delete settings.fg;
   await env.DB.prepare(
-    "INSERT INTO public_cards (id, owner_sub, owner_uid, owner_name, card_id, title, subtitle, card_json, has_fg, status, note, created_at, reviewed_at, likes, dislikes) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', ?, 0, 0, 0)"
+    "INSERT INTO public_cards (id, owner_sub, owner_uid, owner_name, card_id, title, subtitle, card_json, has_fg, source, status, note, created_at, reviewed_at, likes, dislikes) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', ?, 0, 0, 0)"
   )
-    .bind(id, me.sub, me.uid, me.name, cardId, card.title, card.subtitle, JSON.stringify(settings), hasFg ? 1 : 0, Date.now())
+    .bind(id, me.sub, me.uid, me.name, cardId, card.title, card.subtitle, JSON.stringify(settings), hasFg ? 1 : 0, source, Date.now())
     .run();
   return h.json({ id, status: "pending" }, 201);
 }
