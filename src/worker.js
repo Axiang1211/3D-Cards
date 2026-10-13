@@ -69,6 +69,7 @@ export default {
 /* ------------------------------------------------------------------ */
 async function api(request, env, url) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  if (url.pathname === "/api/release" && request.method === "GET") return release(env);
   if (!env.SHARES && !url.pathname.startsWith("/api/google/")) return json({ error: "這個網站沒有開啟分享功能。" }, 501);
 
   if (url.pathname.startsWith("/api/google/")) return google(request, env, url.pathname.slice(12), url);
@@ -412,4 +413,34 @@ function safeEqual(a, b) {
   let r = 0;
   for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return r === 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Newest app release (for the download page): version, date, sizes.  */
+/* Read from GitHub and kept for 10 minutes.                          */
+/* ------------------------------------------------------------------ */
+const REPO = "Axiang1211/3D-Cards";
+async function release(env) {
+  const cache = caches.default;
+  const key = new Request("https://cache.internal/release-" + REPO);
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  let out = { version: "", date: "", assets: {} };
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { "User-Agent": "3d-cards-site", Accept: "application/vnd.github+json" },
+    });
+    if (r.ok) {
+      const d = await r.json();
+      out.version = String(d.tag_name || "").replace(/^v/, "");
+      out.date = d.published_at || "";
+      for (const a of d.assets || []) {
+        if (/setup\.exe$/i.test(a.name)) out.assets.windows = { size: a.size };
+        if (/\.apk$/i.test(a.name)) out.assets.android = { size: a.size };
+      }
+    }
+  } catch (e) {}
+  const res = json(out, 200, { "Cache-Control": "public, max-age=600" });
+  if (out.version) await cache.put(key, res.clone());
+  return res;
 }

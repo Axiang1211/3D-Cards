@@ -51,18 +51,11 @@
         )
       ),
       h("p.hero__note", HC.t("照片只在你的瀏覽器裡處理。只有在你按下「分享」時，那張卡片才會上傳。")),
-      CONFIG.downloadUrl && !window.HC_DESKTOP
-        ? h(
-            "p.hero__download.only-desk",
-            h("a", { href: CONFIG.downloadUrl, rel: "noopener" }, HC.t("下載 Windows 電腦版")),
-            h("span", HC.t("安裝後不用開瀏覽器也能做卡片"))
-          )
-        : null,
-      CONFIG.apkUrl && !window.HC_DESKTOP && /Android/i.test(navigator.userAgent)
+      !window.HC_DESKTOP
         ? h(
             "p.hero__download",
-            h("a", { href: CONFIG.apkUrl, rel: "noopener" }, HC.t("下載 Android App")),
-            h("button.hero__install", { type: "button", onclick: () => HC.pwa && HC.pwa.install() }, HC.t("或直接安裝網頁版 App"))
+            h("a", { href: "#/download" }, HC.t("下載 App")),
+            h("span", HC.t("Windows、Android，安裝後不用開瀏覽器也能做卡片"))
           )
         : null
     );

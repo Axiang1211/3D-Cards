@@ -65,14 +65,17 @@
       }
       howTo();
     },
+    /** Steps for adding the website to a home screen / desktop: "ios", "android", "desktop" or this device. */
+    howTo: (kind) => howTo(kind),
   };
 
-  function howTo() {
+  function howTo(kind) {
+    kind = kind || (ios ? "ios" : MODE.android ? "android" : "desktop");
     const h = HC.h;
     const cfg = window.HC_CONFIG || {};
-    const steps = ios
+    const steps = kind === "ios"
       ? [HC.t("用 Safari 打開這個網站。"), HC.t("按下方的「分享」按鈕。"), HC.t("選「加入主畫面」，再按「新增」。")]
-      : MODE.android
+      : kind === "android"
       ? [HC.t("用 Chrome 打開這個網站。"), HC.t("按右上角的 ⋮ 選單。"), HC.t("選「安裝應用程式」或「加到主畫面」。")]
       : [HC.t("用 Chrome 或 Edge 打開這個網站。"), HC.t("按網址列右邊的「安裝」圖示，或選單裡的「安裝 3D Cards」。")];
     const dlg = h("dialog.share", { "aria-labelledby": "pwa-title" });
@@ -81,7 +84,7 @@
       "div.share__body",
       h("p.share__note", HC.t("安裝後，3D Cards 會像 App 一樣從主畫面或桌面打開，沒有網路也能看你的卡片。")),
       h("ol.howto", steps.map((s) => h("li", s))),
-      MODE.android && cfg.apkUrl
+      kind === "android" && cfg.apkUrl
         ? h("p.share__note", HC.t("也可以直接下載 Android 安裝檔："), " ", h("a", { href: cfg.apkUrl, rel: "noopener" }, "3D-Cards.apk"))
         : null,
       h("div.share__actions", h("button.btn.btn--ink", { type: "button", onclick: close }, HC.t("知道了")))

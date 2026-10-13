@@ -151,6 +151,7 @@
     if ((m = hash.match(/^\/card\/([\w-]+)\/?$/))) return { name: "detail", id: m[1] };
     if ((m = hash.match(/^\/create(?:\/([\w-]+))?\/?$/))) return { name: "create", id: m[1] || null };
     if ((m = hash.match(/^\/s\/([A-Za-z0-9]+)\/?$/))) return { name: "shared", id: m[1] };
+    if (/^\/download\/?$/.test(hash)) return { name: "download" };
     // Pages that only the app has; the website shows its gallery instead.
     if (APP && /^\/samples\/?$/.test(hash)) return { name: "samples" };
     if (APP && /^\/settings\/?$/.test(hash)) return { name: "settings" };
@@ -226,23 +227,8 @@
       links.prepend(ver, upd);
       D.version().then((v) => (ver.textContent = HC.t("電腦版 {v}", { v }))).catch(() => {});
     }
-    // Website: offer to install it as an app (PWA).
-    if (!APP && HC.pwa && HC.pwa.offer) {
-      const nav = document.querySelector(".site-nav");
-      const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      const inst = HC.h("button.site-nav__link.site-nav__install", { type: "button", onclick: () => HC.pwa.install() }, HC.t("安裝 App"));
-      const sync = () => (inst.hidden = !(HC.pwa.promptReady || mobile));
-      HC.pwa.onChange(sync);
-      sync();
-      if (nav) nav.insertBefore(inst, nav.querySelector(".btn"));
-      const fl = document.querySelector(".site-foot__links");
-      if (fl) fl.insertBefore(HC.h("button.site-foot__link.site-foot__btn", { type: "button", onclick: () => HC.pwa.install() }, HC.t("安裝成 App")), fl.querySelector("#repo-link"));
-    }
     const dl = document.getElementById("download-link");
-    if (dl && CONFIG.downloadUrl && !window.HC_DESKTOP) {
-      dl.href = CONFIG.downloadUrl;
-      dl.hidden = false;
-    }
+    if (dl && window.HC_DESKTOP) dl.hidden = true;
     const repo = document.getElementById("repo-link");
     if (repo) {
       if (CONFIG.repoUrl) repo.href = CONFIG.repoUrl;

@@ -888,3 +888,95 @@ body[data-view="detail"] .lang-switch button[aria-pressed="true"] { background: 
   body[data-view="detail"] .site-foot { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
   body[data-view="detail"] .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
 }
+
+/* ------------------------------------------------------------------ */
+/* Download page (#/download)                                          */
+/* ------------------------------------------------------------------ */
+.dl { width: min(1080px, 100%); margin: 0 auto; padding: clamp(28px, 6vh, 64px) var(--gutter) 24px; }
+.dl__intro { max-width: 40em; }
+.dl__title { font-size: clamp(34px, 4.6vw, 58px); letter-spacing: -.035em; line-height: 1.05; }
+.dl__lead { margin-top: 14px; color: var(--muted); font-size: 16px; max-width: 34em; }
+.dl__version { display: block; margin-top: 10px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.4em; }
+.dl__grid {
+  list-style: none;
+  margin: 32px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.dl__tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--wall-hi);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 12px 30px -18px rgba(20, 24, 40, .35);
+  overflow: hidden;
+}
+/* Ready to download: a thin strip of rainbow foil along the top, like the cards. */
+.dl__tile.is-open::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #ff8fa8, #ffd77a, #9cf5b0, #86d9ff, #b69bff);
+}
+.dl__tile.is-mine { box-shadow: 0 0 0 2px var(--ink), 0 12px 30px -18px rgba(20, 24, 40, .35); }
+.dl__tile.is-soon { background: transparent; box-shadow: inset 0 0 0 1px var(--rule); }
+.dl__head { display: flex; align-items: center; gap: 14px; }
+.dl__glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--wall);
+  color: var(--ink);
+}
+.dl__glyph svg { width: 24px; height: 24px; }
+.is-soon .dl__glyph { color: var(--muted); }
+.dl__name { flex: 1; min-width: 0; }
+.dl__name h2 { font-size: 20px; letter-spacing: -.01em; }
+.dl__needs { margin-top: 2px; font-size: 14px; color: var(--muted); }
+.dl__you,
+.dl__soon { flex: none; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; white-space: nowrap; }
+.dl__you { background: var(--ink); color: #fff; }
+.dl__soon { box-shadow: inset 0 0 0 1px var(--rule); color: var(--muted); }
+.dl__tile.is-mine .dl__soon { display: none; }
+.dl__tile.is-mine.is-soon { box-shadow: inset 0 0 0 2px var(--ink); }
+.dl__meta { font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dl__note { font-size: 14px; color: var(--muted); max-width: 36em; }
+.dl__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: auto; }
+.dl__steps { flex-basis: 100%; font-size: 14px; }
+.dl__steps summary { width: max-content; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.dl__steps summary:hover { color: var(--ink); }
+.dl__steps ol { margin: 10px 0 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; }
+.dl__actions .dl__steps { order: 2; }
+.dl__web {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 32px;
+}
+.dl__web-title { font-size: 20px; letter-spacing: -.01em; margin-bottom: 4px; }
+.dl__web .dl__actions { margin-top: 0; }
+.dl__foot { margin-top: 28px; font-size: 13px; color: var(--muted); }
+.dl__foot a { color: inherit; text-underline-offset: 3px; }
+@media (max-width: 760px) {
+  .dl__grid { grid-template-columns: minmax(0, 1fr); }
+  .dl__tile { padding: 20px; }
+  .dl__tile .dl__actions .btn--ink { flex: 1 1 100%; }
+}
+@media (max-width: 440px) {
+  .site-head .brand span { display: none; }
+  .site-nav { gap: 16px; }
+  .site-nav__link { white-space: nowrap; }
+}

@@ -8,6 +8,8 @@
 
 **線上使用：https://3dcards.app.dreamsworld.top/**
 
+**下載 App：https://3dcards.app.dreamsworld.top/#/download**（Windows、Android；Mac 和 iPhone 版即將推出）
+
 **Windows App：[下載 3D-Cards-Setup.exe](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe)**　**Android App：[下載 3D-Cards.apk](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk)**　**iPhone / 其他：把網站安裝成 App**（見下方）
 
 不用註冊，打開網頁就能做。介面有中文和 English，在頁面最下方切換。照片只在你的裝置上處理，只有你按下「分享」的卡片才會上傳。
@@ -205,6 +207,7 @@ public/
   js/view-detail.js      卡片詳細頁
   js/view-create.js      製作卡片
   js/view-shared.js      別人分享的卡片頁
+  js/view-download.js    下載 App 頁面
   js/share.js            分享連結
   js/config.js           網站設定
   js/i18n.js             中英文介面文字
