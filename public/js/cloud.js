@@ -424,16 +424,27 @@
 
     function render() {
       if (!HC.cloud.signedIn) {
-        const go = h("button.btn.btn--ink", { type: "button", onclick: signIn }, HC.t("用 Google 登入"));
+        // Signing in needs agreeing to the privacy policy and terms first.
+        const agree = h("input", { type: "checkbox" });
+        const go = h("button.btn.btn--ink", { type: "button", disabled: true, onclick: () => agree.checked && signIn() }, HC.t("用 Google 登入"));
+        agree.addEventListener("change", () => (go.disabled = !agree.checked));
+        const site = (isDesktop() ? CFG().siteUrl || "" : "").replace(/\/$/, "");
+        const doc = (file, label) => h("a", { href: (site ? site + "/" : "") + file, target: "_blank", rel: "noopener" }, label);
         body.replaceChildren(
           h(
             "p.share__note",
             HC.t("登入 Google 後，你的卡片會存到你自己的 Google 雲端硬碟（一個只有 3D Cards 看得到的隱藏資料夾），換電腦或手機登入同一個帳號就能取回。")
           ),
+          h(
+            "label.check.check--top.cloud-agree",
+            agree,
+            h("span", HC.t("我已閱讀並同意"), doc("privacy.html", HC.lang === "en" ? "Privacy Policy" : HC.t("隱私權政策")), HC.t("和"), doc("terms.html", HC.t("服務條款")))
+          ),
           h("div.share__actions", go, h("button.btn.btn--quiet", { type: "button", onclick: close }, HC.t("取消"))),
           status
         );
         status.textContent = "";
+        agreeBox = agree;
         return;
       }
       const last = ls.get(K_LAST);
@@ -461,7 +472,8 @@
         ].filter(Boolean)
       );
     }
+    let agreeBox = null;
     render();
-    if (start && !HC.cloud.signedIn) signIn();
+    if (start && agreeBox) agreeBox.focus();
   };
 })();

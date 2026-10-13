@@ -1116,3 +1116,7 @@ html.is-app .adm__meta.adm__warn { color: #ffb38a; }
   .adm__item { grid-template-columns: 110px minmax(0, 1fr); gap: 14px; padding: 14px; }
   .pub-head { align-items: flex-start; }
 }
+
+/* Sign-in: agree to the privacy policy and terms first */
+.cloud-agree { margin: 4px 0 2px; font-size: 14px; }
+.cloud-agree a { text-underline-offset: 3px; }
