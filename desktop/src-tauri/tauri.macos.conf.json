@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.icns"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["3dcard"],
+        "name": "3D Card",
+        "role": "Viewer",
+        "mimeType": "application/x-3dcard",
+        "contentTypes": ["top.dreamsworld.3dcards.card"],
+        "exportedType": {
+          "identifier": "top.dreamsworld.3dcards.card",
+          "conformsTo": ["public.json", "public.data"]
+        }
+      }
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "dmg": {
+        "windowSize": { "width": 660, "height": 400 },
+        "appPosition": { "x": 180, "y": 190 },
+        "applicationFolderPosition": { "x": 480, "y": 190 }
+      }
+    }
+  }
+}

@@ -1,29 +1,41 @@
 // 3D Cards app: the website from ../public in a native window — WebView2 on
-// Windows, the system WebView on Android.
+// Windows, WKWebView on macOS, the system WebView on Android.
 //
-// Windows: double-clicking a .3dcard file opens 3D Cards (or the window that
-// is already open) and passes the card to the page, which saves it.
+// Double-clicking a .3dcard file opens 3D Cards (or the window that is
+// already open) and passes the card to the page, which saves it.
+// Windows gives the file as a command-line argument; macOS sends it as an
+// "open file" event (RunEvent::Opened).
 
 use std::sync::Mutex;
 
-/// Card files given on the command line when the app started, waiting for the page to pick them up.
-struct PendingCards(Mutex<Vec<String>>);
+/// Card files waiting for the page to pick them up. Once the page has asked
+/// (`ready`), new cards are sent straight to it with the "open-cards" event.
+struct Pending {
+    ready: bool,
+    cards: Vec<String>,
+}
+
+struct PendingCards(Mutex<Pending>);
+
+fn is_card_file(path: &str) -> bool {
+    let l = path.to_lowercase();
+    l.ends_with(".3dcard") || l.ends_with(".holocard.json")
+}
 
 /// Reads the card files among command-line arguments (the first argument is the program itself).
 fn card_files(args: &[String]) -> Vec<String> {
     args.iter()
         .skip(1)
-        .filter(|a| {
-            let l = a.to_lowercase();
-            l.ends_with(".3dcard") || l.ends_with(".holocard.json")
-        })
+        .filter(|a| is_card_file(a))
         .filter_map(|p| std::fs::read_to_string(p).ok())
         .collect()
 }
 
 #[tauri::command]
 fn take_opened_cards(state: tauri::State<PendingCards>) -> Vec<String> {
-    std::mem::take(&mut *state.0.lock().unwrap())
+    let mut p = state.0.lock().unwrap();
+    p.ready = true;
+    std::mem::take(&mut p.cards)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -49,10 +61,42 @@ pub fn run() {
         }));
     }
 
-    builder
+    let app = builder
         .plugin(tauri_plugin_opener::init())
-        .manage(PendingCards(Mutex::new(card_files(&args))))
+        .manage(PendingCards(Mutex::new(Pending {
+            ready: false,
+            cards: card_files(&args),
+        })))
         .invoke_handler(tauri::generate_handler![take_opened_cards])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("failed to start 3D Cards");
+
+    app.run(|_app, _event| {
+        // macOS: files double-clicked in Finder, or dropped on the Dock icon.
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Opened { urls } = _event {
+            use tauri::{Emitter, Manager};
+            let files: Vec<String> = urls
+                .iter()
+                .filter_map(|u| u.to_file_path().ok())
+                .filter(|p| is_card_file(&p.to_string_lossy()))
+                .filter_map(|p| std::fs::read_to_string(p).ok())
+                .collect();
+            if files.is_empty() {
+                return;
+            }
+            if let Some(w) = _app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+            let state = _app.state::<PendingCards>();
+            let mut p = state.0.lock().unwrap();
+            if p.ready {
+                let _ = _app.emit("open-cards", files);
+            } else {
+                // The page has not loaded yet: it picks these up with take_opened_cards.
+                p.cards.extend(files);
+            }
+        }
+    });
 }

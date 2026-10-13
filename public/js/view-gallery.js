@@ -55,7 +55,7 @@
         ? h(
             "p.hero__download",
             h("a", { href: "#/download" }, HC.t("下載 App")),
-            h("span", HC.t("Windows、Android，安裝後不用開瀏覽器也能做卡片"))
+            h("span", HC.t("Windows、Mac、Android，安裝後不用開瀏覽器也能做卡片"))
           )
         : null
     );

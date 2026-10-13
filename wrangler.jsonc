@@ -23,5 +23,13 @@
   "keep_vars": true,
   "vars": {
     "GOOGLE_WEB_CLIENT_ID": "210055593962-3ajro5cogq75030114aqmh737itftgcl.apps.googleusercontent.com"
+  },
+  // Preview deployments of other branches and pull requests (`wrangler preview` in Cloudflare Builds).
+  // No SHARES or DB here on purpose: a preview never touches the real shared cards or public gallery,
+  // so sharing and the public gallery are switched off there; everything else works.
+  "previews": {
+    "vars": {
+      "GOOGLE_WEB_CLIENT_ID": "210055593962-3ajro5cogq75030114aqmh737itftgcl.apps.googleusercontent.com"
+    }
   }
 }

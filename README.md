@@ -9,9 +9,9 @@
 **線上使用：https://3dcards.app.dreamsworld.top/**
 
 **下載 App：https://3dcards.app.dreamsworld.top/#/download**
-（Windows、Android；Mac 和 iPhone 版即將推出）
+（Windows、Mac、Android；iPhone 版即將推出）
 
-**Windows App：[下載 3D-Cards-Setup.exe](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe)**　**Android App：[下載 3D-Cards.apk](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk)**　**iPhone / 其他：把網站安裝成 App**（見下方）
+**Windows App：[下載 3D-Cards-Setup.exe](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe)**　**Mac App：[下載 3D-Cards.dmg](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.dmg)**　**Android App：[下載 3D-Cards.apk](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk)**　**iPhone / 其他：把網站安裝成 App**（見下方）
 
 不用註冊，打開網頁就能做。介面有中文和 English，在頁面最下方切換。照片只在你的裝置上處理，只有你按下「分享」的卡片才會上傳。
 
@@ -116,7 +116,7 @@
 
 1. 打開卡片，按 **下載卡片檔**，會得到一個 `.3dcard` 檔案（照片也包含在裡面）
 2. 在任何裝置打開網站，到首頁展廳按 **匯入卡片檔**，選這個檔案
-3. 有安裝 Windows 電腦版的話，**直接雙擊 `.3dcard` 檔** 就會用 3D Cards 打開並加入卡片
+3. 有安裝 Windows 或 Mac 電腦版的話，**直接雙擊 `.3dcard` 檔** 就會用 3D Cards 打開並加入卡片
 
 同一個檔案匯入兩次不會變成兩張。舊版的 `.holocard.json` 也可以匯入。
 
@@ -155,7 +155,7 @@
 
 ## 安裝成 App
 
-3D Cards 有三種 App，介面都一樣：深色的卡片庫，電腦上左邊是側邊欄，手機上下方是分頁列。分成「我的卡片」「示範作品」「製作卡片」「設定」；在卡片上按右鍵（手機長按）可以快速打開、分享、匯出、編輯或刪除。
+3D Cards 有四種 App，介面都一樣：深色的卡片庫，電腦上左邊是側邊欄，手機上下方是分頁列。分成「我的卡片」「示範作品」「製作卡片」「設定」；在卡片上按右鍵（手機長按）可以快速打開、分享、匯出、編輯或刪除。
 
 ### Windows
 
@@ -165,6 +165,18 @@
 第一次執行時，Windows 可能會顯示「Windows 已保護您的電腦」。這是因為程式沒有購買數位簽章，按 **其他資訊**，再按 **仍要執行** 就能安裝。電腦版使用 Windows 內建的 Edge 瀏覽器核心（WebView2），少數電腦沒有的話，安裝程式會自動下載。
 
 快速鍵：`Ctrl+N` 製作卡片、`Ctrl+O` 匯入卡片檔、`Ctrl+F` 搜尋、`Ctrl+,` 設定、`Ctrl+S` 儲存卡片；看卡片時 `←` `→` 換卡、空白鍵翻面、`F` 全螢幕、`E` 編輯、`Delete` 刪除、`Esc` 返回。
+
+### Mac
+
+1. 下載 [3D-Cards.dmg](https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.dmg)，或到這個 GitHub 頁面右側的 **Releases** 下載
+2. 打開 `3D-Cards.dmg`，把 **3D Cards** 拖到 **應用程式** 資料夾
+3. 從「應用程式」或 Launchpad 打開 3D Cards
+
+支援 macOS 10.15 以上，Apple 晶片（M1 以後）和 Intel 的 Mac 都可以用同一個檔案。
+
+第一次打開時，Mac 可能會說「無法打開」或「無法驗證開發者」。這是因為程式沒有購買 Apple 的開發者簽章：到 **系統設定** → **隱私權與安全性**，往下捲到底按 **仍要打開**，之後就能正常打開。
+
+快速鍵和 Windows 一樣，把 `Ctrl` 換成 `⌘`。
 
 ### Android
 
@@ -184,7 +196,7 @@
 
 ### 更新
 
-Windows 和 Android App 每次打開都會到 GitHub 檢查有沒有新版本。有的話會問你要不要更新：
+Windows、Mac 和 Android App 每次打開都會到 GitHub 檢查有沒有新版本。有的話會問你要不要更新：
 
 - **下載新版**：下載新的安裝檔，安裝後就會換成新版本，做過的卡片都會保留
 - **稍後再說**：繼續使用目前的版本，但不會有新功能
@@ -220,7 +232,7 @@ public/
   index.html             網站唯一的頁面
   css/holo-card.css      卡片的所有視覺效果（鐳射、反光、視差）
   css/style.css          網站版面
-  css/app.css            App 版面（Windows、Android、安裝後的網站）
+  css/app.css            App 版面（Windows、Mac、Android、安裝後的網站）
   js/holo-card.js        卡片元件
   js/motion.js           彈簧物理、陀螺儀
   js/store.js            把卡片存在瀏覽器（IndexedDB）
@@ -248,7 +260,7 @@ public/
   brand/                 Logo 和網站圖示
   gallery/gallery.js     展廳裡的示範卡片清單
 src/worker.js            分享功能的伺服器（Cloudflare Worker）
-desktop/                 Windows 和 Android App（Tauri）
+desktop/                 Windows、Mac 和 Android App（Tauri）
 scripts/
   add-card.mjs           把卡片檔加入示範展廳（需要 Node.js）
   make-demo-art.py       重新產生示範卡片的圖（需要 Python）

@@ -1,0 +1,83 @@
+# Tries the newest Mac app on a real Mac (GitHub's macOS machine), the way a person would:
+# downloads 3D-Cards.dmg from the newest release, drags the app into Applications, opens it,
+# then double-clicks a .3dcard file. Screenshots are kept under the run's "Artifacts".
+#
+# Runs by itself after every 「建置 App」 run, or: Actions → 「測試 Mac 版」 → Run workflow.
+
+name: 測試 Mac 版
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["建置 App（Windows + Mac + Android）"]
+    types: [completed]
+  push:
+    paths: [".github/workflows/mac-test.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download and install
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern 3D-Cards.dmg --dir "$RUNNER_TEMP"
+          hdiutil attach "$RUNNER_TEMP/3D-Cards.dmg" -nobrowse -readonly -mountpoint /Volumes/3dcards >/dev/null
+          ls -la /Volumes/3dcards
+          cp -R "/Volumes/3dcards/3D Cards.app" /Applications/
+          hdiutil detach /Volumes/3dcards >/dev/null
+          echo "Version: $(defaults read "/Applications/3D Cards.app/Contents/Info.plist" CFBundleShortVersionString)"
+          echo "Mac: $(sw_vers -productVersion) $(uname -m)"
+
+      - name: Open the app
+        run: |
+          open "/Applications/3D Cards.app"
+          sleep 25
+          if ! pgrep -x three-d-cards >/dev/null; then
+            echo "::error::3D Cards 打開後沒有在執行"
+            log show --last 3m --style compact --predicate 'process == "three-d-cards"' | tail -n 40
+            exit 1
+          fi
+          mkdir -p shots
+          screencapture -x shots/1-app.png
+
+      - name: Double-click a card file
+        run: |
+          python3 - <<'EOF'
+          import base64, json
+          svg = open("public/gallery/ridgeline-bg.svg", "rb").read()
+          card = {
+              "title": "Mac 測試卡", "subtitle": "Opened from Finder", "serial": "MAC",
+              "image": "data:image/svg+xml;base64," + base64.b64encode(svg).decode(),
+              "foil": "rainbow", "area": "full", "frame": "gold",
+          }
+          json.dump({"format": "3d-cards", "version": 2, "card": card}, open("/tmp/Mac-test.3dcard", "w"), ensure_ascii=False)
+          EOF
+          # Same as a double-click in Finder: macOS picks the app registered for .3dcard.
+          /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/3D Cards.app"
+          if ! open /tmp/Mac-test.3dcard; then
+            echo "::warning::macOS 沒有把 .3dcard 檔案交給 3D Cards，改用「打開檔案」直接交給 App"
+            open -a "/Applications/3D Cards.app" /tmp/Mac-test.3dcard
+          fi
+          sleep 10
+          pgrep -x three-d-cards >/dev/null || { echo "::error::打開卡片檔後 3D Cards 關掉了"; exit 1; }
+          screencapture -x shots/2-card.png
+
+      - name: Keep screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-screenshots
+          path: shots/
+          retention-days: 14
+
+      - name: Quit
+        if: always()
+        run: osascript -e 'quit app "3D Cards"' || true
