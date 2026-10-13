@@ -30,6 +30,9 @@ window.HC_CONFIG = {
 
   downloadUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe",
 
+  /* "App 主頁": the page listing all Dreamsworld apps, linked at the top left and in the footer. Leave empty to hide. */
+  hubUrl: "https://www.app.dreamsworld.top/",
+
   /* The newest Android app (APK) on the Releases page. Leave empty to hide the links. */
   apkUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk",
 };

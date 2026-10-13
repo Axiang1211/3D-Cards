@@ -728,6 +728,7 @@
         T("3D Cards 是開源專案，以 MIT 授權釋出。照片只在你的裝置上處理，按下「分享」的卡片才會上傳。"),
         h(
           "div.set__row",
+          cfg.hubUrl ? h("a.btn.btn--soft", { href: cfg.hubUrl, rel: "noopener", target: "_blank" }, T("Dreamsworld App 主頁")) : null,
           cfg.repoUrl ? h("a.btn.btn--soft", { href: cfg.repoUrl, rel: "noopener", target: "_blank" }, T("原始碼")) : null,
           h("a.btn.btn--soft", { href: (cfg.siteUrl || "") + "/privacy.html", rel: "noopener", target: "_blank" }, T("隱私權政策")),
           cfg.siteUrl && MODE.tauri ? h("a.btn.btn--soft", { href: cfg.siteUrl, rel: "noopener", target: "_blank" }, T("網站")) : null

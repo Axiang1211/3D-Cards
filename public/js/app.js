@@ -227,6 +227,16 @@
       links.prepend(ver, upd);
       D.version().then((v) => (ver.textContent = HC.t("電腦版 {v}", { v }))).catch(() => {});
     }
+    // Back to the Dreamsworld app list (website only; the apps have it in Settings).
+    ["hub-link", "hub-foot"].forEach((id) => {
+      const a = document.getElementById(id);
+      if (!a) return;
+      if (CONFIG.hubUrl && !APP) {
+        a.href = CONFIG.hubUrl;
+        a.hidden = false;
+        a.setAttribute("aria-label", HC.t("回到 Dreamsworld App 主頁"));
+      } else a.hidden = true;
+    });
     const dl = document.getElementById("download-link");
     if (dl && window.HC_DESKTOP) dl.hidden = true;
     const repo = document.getElementById("repo-link");

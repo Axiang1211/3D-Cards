@@ -126,6 +126,26 @@ button { font: inherit; color: inherit; }
           backdrop-filter: blur(14px);
 }
 body[data-view="detail"] .site-head { background: color-mix(in srgb, var(--room) 80%, transparent); }
+.site-head__start { display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* Back to the Dreamsworld app list: a quiet pill before the logo. */
+.hub {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 12px 0 6px;
+  border-radius: 999px;
+  background: rgba(27, 29, 33, .06);
+  color: var(--muted);
+  font-size: 13.5px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hub[hidden] { display: none; }
+.hub:hover { background: rgba(27, 29, 33, .1); color: var(--ink); }
+.hub__icon { width: 18px; height: 18px; }
+body[data-view="detail"] .hub { background: rgba(255, 255, 255, .08); color: var(--room-muted); }
+body[data-view="detail"] .hub:hover { background: rgba(255, 255, 255, .14); color: var(--room-ink); }
 .brand {
   display: inline-flex;
   align-items: center;
@@ -977,6 +997,8 @@ body[data-view="detail"] .lang-switch button[aria-pressed="true"] { background: 
 }
 @media (max-width: 440px) {
   .site-head .brand span { display: none; }
+  .hub { width: 32px; padding: 0; justify-content: center; }
+  .hub__label { display: none; }
   .site-nav { gap: 16px; }
   .site-nav__link { white-space: nowrap; }
 }
