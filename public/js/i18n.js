@@ -374,6 +374,7 @@
   "這張卡片是我分享的公開照片。若版權方要求下架，我願意接受下架要求。": "This card uses a public photo I'm sharing. If the copyright holder asks for it to be taken down, I accept that.",
   "選一個符合的說明：": "Choose the statement that fits:",
   "公開": "Public",
+  "和作者不同，照片可能來自別人": "differs from the author; the photo may be someone else's",
   "這張卡片來自公開展廳，照片屬於原作者，不能編輯。你可以沿用它的參數，換上自己的照片，儲存後會成為一張新卡片。": "This card comes from the public gallery. Its photo belongs to the author and can't be edited. You can reuse its settings with your own photo; saving makes a new card.",
   "這張卡片正在公開展廳審核中，不能直接修改。儲存後會成為一張新卡片，送審的那張不會改變。想修改原卡片，請先取消送審。": "This card is waiting for review in the public gallery, so it can't be changed. Saving makes a new card; the one under review stays as it is. To change the original, cancel the review first.",
   "這張卡片已經公開在展廳，不能直接修改。儲存後會成為一張新卡片，公開的那張不會改變。想修改原卡片，請先從公開展廳下架。": "This card is in the public gallery, so it can't be changed. Saving makes a new card; the public one stays as it is. To change the original, take it out of the public gallery first.",

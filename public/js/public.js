@@ -451,30 +451,13 @@
         }
       } catch (e) {}
     });
-    const saveBtn = h("button.btn.btn--light", { type: "button" }, T("存到我的卡片"));
-    saveBtn.addEventListener("click", async () => {
-      saveBtn.disabled = true;
-      try {
-        const own = await HC.cards.own();
-        const dup = own.find((c) => c.fromPublic === it.id);
-        if (dup) return HC.go("#/card/" + dup.id);
-        const payload = await HC.io.payload(Object.assign({}, data, { own: false }));
-        const rec = await HC.io.recordFromCard(payload);
-        rec.fromPublic = it.id;
-        const id = await HC.store.put(rec);
-        HC.toast(T("已存到「我的卡片」"));
-        HC.go("#/card/" + id);
-      } catch (e) {
-        saveBtn.disabled = false;
-        HC.toast(T("儲存失敗：儲存空間可能已滿。"), "error");
-      }
-    });
     const tools = [
       shareBtn,
       h("button.btn.btn--light", { type: "button", onclick: () => HC.openFullscreen(card.data) }, T("全螢幕")),
       h("button.btn.btn--light", { type: "button", onclick: () => card.flip() }, T("翻面")),
       it.card && it.card.sand && it.card.fg ? h("button.btn.btn--light", { type: "button", onclick: () => card.turn() }, T("上下顛倒")) : null,
-      saveBtn,
+      // No "save to my cards": the photo stays the author's, so it can't be published again by
+      // someone else. The settings can be reused with your own photo.
       h("button.btn.btn--light", { type: "button", title: T("沿用這張卡片的鐳射、邊框和流沙設定，換上你自己的照片。"), onclick: () => useSettings(data) }, T("用這組參數製作")),
     ];
     const who = await HC.account.me();
@@ -602,7 +585,14 @@
         fetch(data.image)
           .then((r) => r.blob())
           .then((b) => HC.watermark.read(b))
-          .then((t) => (wm.textContent = T("水印：{text}", { text: t || T("沒有") })))
+          .then((t) => {
+            wm.textContent = T("水印：{text}", { text: t || T("沒有") });
+            // The photo carries someone else's mark: probably not the author's own picture.
+            if (t && it.authorUid && !t.includes("#" + it.authorUid)) {
+              wm.classList.add("adm__warn");
+              wm.textContent += " — " + T("和作者不同，照片可能來自別人");
+            }
+          })
           .catch(() => (wm.textContent = T("水印：無法讀取")));
         listEl.appendChild(
           h(
