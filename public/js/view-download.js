@@ -154,9 +154,23 @@
       )
     );
 
-    // Newest version and file sizes, when the site can tell.
+    // Newest version and file sizes: from the site, or straight from GitHub.
+    const fromGitHub = () =>
+      fetch("https://api.github.com/repos/" + String(cfg.repoUrl || "").replace(/^https:\/\/github\.com\//, "") + "/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!d) return null;
+          const assets = {};
+          (d.assets || []).forEach((a) => {
+            if (/setup\.exe$/i.test(a.name)) assets.windows = { size: a.size };
+            if (/\.apk$/i.test(a.name)) assets.android = { size: a.size };
+          });
+          return { version: String(d.tag_name || "").replace(/^v/, ""), date: d.published_at, assets };
+        });
     fetch("/api/release")
       .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
+      .then((d) => (d && d.version ? d : cfg.repoUrl ? fromGitHub() : null))
       .then((d) => {
         if (!d || !d.version) return;
         const date = d.date ? new Date(d.date) : null;

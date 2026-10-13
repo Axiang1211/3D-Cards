@@ -35,7 +35,7 @@ const SECURITY_HEADERS = {
     "frame-src https://accounts.google.com; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src https://fonts.gstatic.com; img-src 'self' data: blob:; " +
-    "connect-src 'self' data: blob: https://cdn.jsdelivr.net https://accounts.google.com https://www.googleapis.com https://openidconnect.googleapis.com https://oauth2.googleapis.com; " +
+    "connect-src 'self' data: blob: https://cdn.jsdelivr.net https://accounts.google.com https://www.googleapis.com https://openidconnect.googleapis.com https://oauth2.googleapis.com https://api.github.com; " +
     "object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
 };
 
@@ -425,12 +425,11 @@ async function release(env) {
   const key = new Request("https://cache.internal/release-" + REPO);
   const hit = await cache.match(key);
   if (hit) return hit;
-  let out = { version: "", date: "", assets: {}, check: [] };
+  let out = { version: "", date: "", assets: {} };
   try {
     const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
       headers: { "User-Agent": "3d-cards-site", Accept: "application/vnd.github+json" },
     });
-    out.check.push("api " + r.status);
     if (r.ok) {
       const d = await r.json();
       out.version = String(d.tag_name || "").replace(/^v/, "");
@@ -440,28 +439,22 @@ async function release(env) {
         if (/\.apk$/i.test(a.name)) out.assets.android = { size: a.size };
       }
     }
-  } catch (e) {
-    out.check.push("api " + e.message);
-  }
+  } catch (e) {}
   // The GitHub API often refuses shared Cloudflare addresses (rate limit): read the release page instead.
   if (!out.version) {
     try {
       const r = await fetch(`https://github.com/${REPO}/releases/latest`, { redirect: "manual", headers: { "User-Agent": "3d-cards-site" } });
-      out.check.push("page " + r.status + " " + (r.headers.get("Location") || ""));
       const m = /\/tag\/v?([\w.-]+)$/.exec(r.headers.get("Location") || "");
       if (m) out.version = m[1];
       const size = async (file) => {
         const h = await fetch(`https://github.com/${REPO}/releases/latest/download/${file}`, { method: "HEAD", headers: { "User-Agent": "3d-cards-site" } });
         const n = +h.headers.get("Content-Length");
-        out.check.push(file + " " + h.status + " " + n);
         return h.ok && n ? { size: n } : null;
       };
       const [win, apk] = await Promise.all([size("3D-Cards-Setup.exe"), size("3D-Cards.apk")]);
       if (win) out.assets.windows = win;
       if (apk) out.assets.android = apk;
-    } catch (e) {
-      out.check.push("page " + e.message);
-    }
+    } catch (e) {}
   }
   const res = json(out, 200, { "Cache-Control": "public, max-age=600" });
   if (out.version) await cache.put(key, res.clone());
