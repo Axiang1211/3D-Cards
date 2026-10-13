@@ -8,7 +8,9 @@
     "tauri": "tauri",
     "web": "node copy-web.js",
     "dev": "node copy-web.js && tauri dev",
-    "build": "node copy-web.js && tauri build --bundles nsis"
+    "build": "node copy-web.js && tauri build --bundles nsis",
+    "build:mac": "node copy-web.js && tauri build --bundles app",
+    "build:mac:dmg": "node copy-web.js && tauri build --bundles dmg"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.0"
