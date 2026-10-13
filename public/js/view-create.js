@@ -75,7 +75,47 @@
       }
     }
 
-    const draft = Object.assign({}, HC.DEFAULTS, { imageBlob: null, fgBlob: null }, editing || {});
+    // edit: change the card itself.
+    // copy: your card is in the public gallery (or waiting for review), so it's saved as a new card.
+    // template: settings from someone else's public card, with your own photo; also a new card.
+    let mode = editing ? "edit" : "new";
+    let base = editing;
+    let lockNote = "";
+    if (HC.pub) {
+      if (editing) {
+        const lock = await HC.pub.lockOf(editing, true);
+        if (lock && lock.reason === "copy") {
+          mode = "template";
+          base = HC.pub.settingsOf(editing);
+          lockNote = HC.t("這張卡片來自公開展廳，照片屬於原作者，不能編輯。你可以沿用它的參數，換上自己的照片，儲存後會成為一張新卡片。");
+        } else if (lock) {
+          mode = "copy";
+          base = Object.assign(HC.pub.settingsOf(editing), {
+            title: editing.title,
+            subtitle: editing.subtitle,
+            serial: editing.serial,
+            imageBlob: editing.imageBlob,
+            fgBlob: editing.fgBlob,
+          });
+          lockNote =
+            lock.reason === "pending"
+              ? HC.t("這張卡片正在公開展廳審核中，不能直接修改。儲存後會成為一張新卡片，送審的那張不會改變。想修改原卡片，請先取消送審。")
+              : HC.t("這張卡片已經公開在展廳，不能直接修改。儲存後會成為一張新卡片，公開的那張不會改變。想修改原卡片，請先從公開展廳下架。");
+        }
+      } else {
+        const t = HC.pub.takeTemplate();
+        if (t) {
+          mode = "template";
+          base = t.settings;
+          lockNote = HC.t("已套用「{title}」的參數。公開作品的照片不能使用，請選擇你自己的照片。", { title: t.title || HC.t("未命名卡片") });
+        }
+      }
+    }
+    const isEdit = mode === "edit";
+    const heading = isEdit ? HC.t("編輯卡片") : mode === "copy" ? HC.t("另存新卡片") : mode === "template" ? HC.t("用這組參數製作") : HC.t("製作卡片");
+    const saveLabel = isEdit ? HC.t("儲存變更") : mode === "new" ? HC.t("儲存到展廳") : HC.t("儲存為新卡片");
+
+    const draft = Object.assign({}, HC.DEFAULTS, { imageBlob: null, fgBlob: null }, base || {});
     delete draft.image;
     delete draft.fg;
     const urls = { bg: "", fg: "" };
@@ -122,7 +162,7 @@
       try {
         draft.imageBlob = await HC.io.processImage(file);
         setUrl("bg", draft.imageBlob);
-        if (!editing && !draft.title) {
+        if (!isEdit && !draft.title) {
           const base = file.name.replace(/\.[^.]+$/, "").slice(0, 24);
           if (base && !/^(img|dsc|pxl|image|photo)[\W_]?\d/i.test(base)) {
             draft.title = base;
@@ -400,11 +440,12 @@
     });
 
     /* Save -------------------------------------------------------------- */
-    const saveBtn = h("button.btn.btn--ink.btn--wide", { type: "submit" }, editing ? HC.t("儲存變更") : HC.t("儲存到展廳"));
+    const saveBtn = h("button.btn.btn--ink.btn--wide", { type: "submit" }, saveLabel);
     const form = h(
       "form.maker__form",
       { novalidate: true },
-      h("div.maker__head", h("h1.maker__title", editing ? HC.t("編輯卡片") : HC.t("製作卡片")), h("p.maker__lead", HC.t("照片在你的瀏覽器裡處理和儲存。只有按下「分享」的卡片才會上傳。"))),
+      h("div.maker__head", h("h1.maker__title", heading), h("p.maker__lead", HC.t("照片在你的瀏覽器裡處理和儲存。只有按下「分享」的卡片才會上傳。"))),
+      lockNote ? h("p.maker__lock", { role: "note" }, lockNote) : null,
       h(
         "fieldset.group",
         h("legend.group__title", HC.t("照片")),
@@ -460,7 +501,7 @@
       saveBtn.disabled = true;
       try {
         const id = await HC.store.put(Object.assign({}, draft, { title: draft.title.trim() }));
-        HC.toast(editing ? HC.t("已儲存變更") : HC.t("已儲存到展廳"));
+        HC.toast(isEdit ? HC.t("已儲存變更") : mode === "new" ? HC.t("已儲存到展廳") : HC.t("已另存成新卡片"));
         HC.go("#/card/" + id);
       } catch (err) {
         saveBtn.disabled = false;
@@ -484,7 +525,8 @@
     refresh();
 
     return {
-      title: editing ? HC.t("編輯卡片") : HC.t("製作卡片"),
+      title: heading,
+      saveLabel,
       destroy() {
         card.destroy();
         setUrl("bg", null);

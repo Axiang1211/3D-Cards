@@ -532,6 +532,16 @@ body[data-view="detail"] .site-foot { color: var(--room-muted); border-color: va
 .maker__head { padding-bottom: 24px; }
 .maker__title { font-size: clamp(30px, 3.4vw, 44px); letter-spacing: -.03em; line-height: 1.1; }
 .maker__lead { margin-top: 10px; color: var(--muted); font-size: 14px; }
+.maker__lock {
+  margin: 2px 0 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(214, 150, 40, .14);
+  color: #6f4a0e;
+  font-size: 14px;
+  line-height: 1.6;
+}
+html.is-app .maker__lock { background: rgba(240, 180, 70, .14); color: #f2c779; }
 
 .group {
   margin: 0;

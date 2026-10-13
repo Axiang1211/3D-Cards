@@ -638,6 +638,12 @@
     );
     root.appendChild(inner);
     const ctl = await HC.views.create(inner, route);
+    // A public card is saved as a new one; the maker says so.
+    if (ctl && ctl.saveLabel) saveBtn.lastElementChild.textContent = ctl.saveLabel;
+    if (ctl && ctl.title) {
+      const t = root.querySelector(".bar__title h1");
+      if (t) t.textContent = ctl.title;
+    }
     const form = inner.querySelector("form");
     if (form) {
       saveBtn.addEventListener("click", () => (form.requestSubmit ? form.requestSubmit() : form.querySelector("[type=submit]").click()));

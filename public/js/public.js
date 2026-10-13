@@ -128,9 +128,46 @@
   }
 
   /** Where one of your cards stands: null, or { status, id, likes, note }. */
-  async function statusOf(card) {
-    const list = await mine();
+  async function statusOf(card, force) {
+    const list = await mine(force);
     return list.find((x) => x.card_id === card.id) || null;
+  }
+
+  /**
+   * Why a card can't be edited in place, or null.
+   *   "pending" / "approved": you sent it to the public gallery. Editing makes a new card;
+   *                           withdraw it (or the admin takes it down) to edit the original.
+   *   "copy":                 saved from someone else's public card. Its photo stays theirs;
+   *                           only the settings can be reused, with your own photo.
+   */
+  async function lockOf(card, force) {
+    if (!card) return null;
+    if (card.fromPublic) return { reason: "copy", pubId: card.fromPublic };
+    const s = await statusOf(card, force).catch(() => null);
+    if (s && (s.status === "pending" || s.status === "approved")) return { reason: s.status, pubId: s.id };
+    return null;
+  }
+
+  /** A card's look (foil, frame, sand…) without its photos and text. */
+  const NOT_SETTINGS = ["title", "subtitle", "serial", "image", "fg"];
+  function settingsOf(c) {
+    const o = {};
+    Object.keys(HC.DEFAULTS).forEach((k) => {
+      if (!NOT_SETTINGS.includes(k) && c[k] !== undefined) o[k] = c[k];
+    });
+    return o;
+  }
+
+  /** Open the maker with another card's settings; the maker picks them up once. */
+  let template = null;
+  function useSettings(c) {
+    template = { settings: settingsOf(c), title: c.title || "" };
+    HC.go("#/create");
+  }
+  function takeTemplate() {
+    const t = template;
+    template = null;
+    return t;
   }
 
   function statusText(s) {
@@ -235,12 +272,13 @@
         btn.onclick = async () => (await submit(card)) && sync();
       }
     }
-    if (HC.cloud && HC.cloud.available) sync();
+    // Someone else's public card saved here can't be shown again as yours.
+    if (HC.cloud && HC.cloud.available && !card.fromPublic) sync();
     else wrap.hidden = true;
     return wrap;
   }
 
-  HC.pub = { submit, mine, statusOf, ownCardPanel, cardData, votes, notice, dateText, sourceTag };
+  HC.pub = { submit, mine, statusOf, lockOf, settingsOf, useSettings, takeTemplate, ownCardPanel, cardData, votes, notice, dateText, sourceTag };
 
   /* ------------------------------------------------------------------ */
   /* Gallery page                                                        */
@@ -437,6 +475,7 @@
       h("button.btn.btn--light", { type: "button", onclick: () => card.flip() }, T("翻面")),
       it.card && it.card.sand && it.card.fg ? h("button.btn.btn--light", { type: "button", onclick: () => card.turn() }, T("上下顛倒")) : null,
       saveBtn,
+      h("button.btn.btn--light", { type: "button", title: T("沿用這張卡片的鐳射、邊框和流沙設定，換上你自己的照片。"), onclick: () => useSettings(data) }, T("用這組參數製作")),
     ];
     const who = await HC.account.me();
     const takeDown =
