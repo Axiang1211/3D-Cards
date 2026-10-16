@@ -82,6 +82,8 @@
         href: cfg.apkUrl,
         file: T(".apk 安裝檔"),
         action: T("下載 APK"),
+        storeUrl: cfg.playTestUrl !== undefined ? cfg.playTestUrl : "https://forms.gle/kuD9ebtwevnp89M9A",
+        storeLabel: T("Play Store 封閉測試申請"),
         note: T("目前只提供 APK，沒有在 Play 商店上架。"),
         steps: [
           T("用手機下載 3D-Cards.apk，再打開它。"),

@@ -527,6 +527,7 @@
   "Android 7.0 以上": "Android 7.0 or later",
   ".apk 安裝檔": ".apk installer",
   "下載 APK": "Download APK",
+  "Play Store 封閉測試申請": "Apply for Play Store closed testing",
   "目前只提供 APK，沒有在 Play 商店上架。": "Available as an APK only, not on Google Play.",
   "用手機下載 3D-Cards.apk，再打開它。": "Download 3D-Cards.apk on your phone and open it.",
   "第一次會問要不要允許瀏覽器「安裝不明來源的應用程式」，允許後按「安裝」。": "The first time, allow your browser to “install unknown apps”, then tap Install.",

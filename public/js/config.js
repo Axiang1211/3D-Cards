@@ -47,4 +47,7 @@ window.HC_CONFIG = {
 
   /* The newest Android app (APK) on the Releases page. Leave empty to hide the links. */
   apkUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards.apk",
+
+  /* Google Play closed testing sign-up form for the Android app. Leave empty to hide the link. */
+  playTestUrl: "https://forms.gle/kuD9ebtwevnp89M9A",
 };
