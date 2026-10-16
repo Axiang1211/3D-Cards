@@ -983,6 +983,8 @@ body[data-view="detail"] .lang-switch button[aria-pressed="true"] { background: 
 .dl__meta { font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .dl__note { font-size: 14px; color: var(--muted); max-width: 36em; }
 .dl__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: auto; }
+.dl__link { font-size: 14px; font-weight: 550; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.dl__link:hover { color: var(--muted); }
 .dl__steps { flex-basis: 100%; font-size: 14px; }
 .dl__steps summary { width: max-content; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .dl__steps summary:hover { color: var(--ink); }

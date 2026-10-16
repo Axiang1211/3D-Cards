@@ -48,6 +48,8 @@
         href: cfg.downloadUrl,
         file: T(".exe 安裝檔"),
         action: T("下載 Windows 版"),
+        storeUrl: cfg.storeUrl !== undefined ? cfg.storeUrl : "https://apps.microsoft.com/detail/9NF04B59SKW3?hl=en-us&gl=MY&ocid=pdpshare",
+        storeLabel: T("Microsoft Store 下載"),
         steps: [
           T("下載後雙擊 3D-Cards-Setup.exe，照著畫面安裝。"),
           T("如果出現「Windows 已保護您的電腦」，按「其他資訊」→「仍要執行」。這是因為程式沒有購買數位簽章。"),
@@ -118,6 +120,7 @@
             h(
               "div.dl__actions",
               h("a.btn.btn--ink", { href: p.href, rel: "noopener", download: "" }, p.action),
+              p.storeUrl ? h("a.dl__link", { href: p.storeUrl, rel: "noopener" }, p.storeLabel) : null,
               h("details.dl__steps", h("summary", T("安裝步驟")), h("ol", p.steps.map((s) => h("li", s))))
             ),
           ]

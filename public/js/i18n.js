@@ -511,6 +511,7 @@
   "Windows 10、11": "Windows 10 and 11",
   ".exe 安裝檔": ".exe installer",
   "下載 Windows 版": "Download for Windows",
+  "Microsoft Store 下載": "Download from Microsoft Store",
   "下載後雙擊 3D-Cards-Setup.exe，照著畫面安裝。": "Double-click 3D-Cards-Setup.exe and follow the steps.",
   "如果出現「Windows 已保護您的電腦」，按「其他資訊」→「仍要執行」。這是因為程式沒有購買數位簽章。": "If “Windows protected your PC” appears, choose “More info” → “Run anyway”. It shows because the app isn't code-signed.",
   "桌面會出現 3D Cards。之後有新版本，打開時會提示更新。": "3D Cards appears on your desktop. It tells you when a new version is out.",

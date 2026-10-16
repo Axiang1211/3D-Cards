@@ -30,6 +30,9 @@ window.HC_CONFIG = {
 
   downloadUrl: "https://github.com/Axiang1211/3D-Cards/releases/latest/download/3D-Cards-Setup.exe",
 
+  /* The Microsoft Store page for the Windows app. Leave empty to hide the link. */
+  storeUrl: "https://apps.microsoft.com/detail/9NF04B59SKW3?hl=en-us&gl=MY&ocid=pdpshare",
+
   /* "App 主頁": the page listing all Dreamsworld apps, linked at the top left and in the footer. Leave empty to hide. */
   hubUrl: "https://www.app.dreamsworld.top/",
 
