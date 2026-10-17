@@ -7,7 +7,7 @@
  *  - Fonts and the cut-out tool from CDNs: from the cache once downloaded.
  *  - Shares, Google sign-in and other /api calls: never cached.
  */
-const VERSION = "v7";
+const VERSION = "v8";
 const SHELL = "3dcards-shell-" + VERSION;
 const RUNTIME = "3dcards-runtime-" + VERSION;
 const CDN = "3dcards-cdn-" + VERSION;

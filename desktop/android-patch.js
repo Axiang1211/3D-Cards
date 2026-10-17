@@ -39,7 +39,7 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    val bg = Color.parseColor("#141724")
+    val bg = Color.parseColor("#0A0C10")
     window.decorView.setBackgroundColor(bg)
     val content = findViewById<android.view.View>(android.R.id.content)
     // Keep the page clear of the status bar, the navigation bar and camera cut-outs.

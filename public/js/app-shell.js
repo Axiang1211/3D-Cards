@@ -1,14 +1,14 @@
 /*
  * app-shell.js
- * The app layout, used by the Windows and Android apps and by the website
+ * The app layout, used by the Windows, Mac and Android apps and by the website
  * once it is installed (see mode.js). The website keeps its own look.
  *
- *   computer   side bar (My cards / Samples / New card … Settings) + pages
- *   phone      top bar + tab bar at the bottom
- *
- * Pages: library (#/), samples (#/samples), viewer (#/card/<id>),
- * maker (#/create, wraps view-create.js), settings (#/settings),
- * shared card (#/s/<id>, wraps view-shared.js).
+ * Designed with Vibe UI/UX principles:
+ *   - Macro Grid Rail Alignment (--page-gutter: 32px desktop / 20px mobile)
+ *   - Micro Optical Centering on asymmetric icons
+ *   - Floating Island + Collapsible Sidebar (desktop) & Floating Glass Magnify Tab Bar (phone)
+ *   - Custom Select with checkmark & Multi-select Filter Chips with spring check animation
+ *   - Press Tilt cards with radial spotlight & Card Tray with 120ms delayed content fade-in
  */
 (function () {
   "use strict";
@@ -21,7 +21,7 @@
   HC.appViews = {};
 
   /* ------------------------------------------------------------------ */
-  /* Icons (24 × 24, drawn with the current text colour)                 */
+  /* Icons (24 × 24, with optical alignment classes)                     */
   /* ------------------------------------------------------------------ */
   const P = {
     cards: '<rect x="3.5" y="5" width="11" height="15" rx="2"/><path d="M17.5 7.2l1.6.5a2 2 0 0 1 1.3 2.5l-3 9.6"/><path d="M7 9.5h4"/>',
@@ -49,10 +49,13 @@
     info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.1"/>',
     refresh: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/>',
     box: '<path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5z"/><path d="M4 7.5 12 11l8-3.5M12 11v9"/>',
+    check: '<path d="M5 12.5l4.5 4.5 9.5-9.5"/>',
+    chevron: '<path d="M6.5 9.5L12 15l5.5-5.5"/>',
+    sidebar: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>',
   };
   function icon(name) {
-    const s = h("span.ico", { "aria-hidden": "true" });
-    s.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${P[name] || ""}</svg>`;
+    const s = h("span.ico.ico--" + name, { "aria-hidden": "true" });
+    s.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${P[name] || ""}</svg>`;
     return s;
   }
   HC.icon = icon;
@@ -60,9 +63,88 @@
   // The Android app's WebView can't save downloads; cards move between devices with sync or links there.
   const CAN_EXPORT = !(MODE.tauri && MODE.android);
   const narrow = () => matchMedia("(max-width: 860px)").matches;
+  const COLLAPSE_KEY = "hc:side-collapsed";
 
   /* ------------------------------------------------------------------ */
-  /* Shell                                                               */
+  /* Micro-interactions: Press Tilt & Magnify Row                        */
+  /* ------------------------------------------------------------------ */
+  function attachPressTilt(el) {
+    let pressed = false;
+    const onDown = (e) => {
+      if (e.button && e.button !== 0) return;
+      pressed = true;
+      el.classList.add("is-pressed");
+      update(e);
+    };
+    const update = (e) => {
+      if (!pressed) return;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const cy = e.touches ? e.touches[0].clientY : e.clientY;
+      const x = Math.max(0, Math.min(r.width, cx - r.left));
+      const y = Math.max(0, Math.min(r.height, cy - r.top));
+      const rotY = ((x / r.width) - 0.5) * 11;
+      const rotX = (0.5 - (y / r.height)) * 11;
+      el.style.transform = `perspective(700px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) scale(0.97)`;
+      el.style.setProperty("--spot-x", `${x.toFixed(0)}px`);
+      el.style.setProperty("--spot-y", `${y.toFixed(0)}px`);
+    };
+    const reset = () => {
+      if (!pressed) return;
+      pressed = false;
+      el.classList.remove("is-pressed");
+      el.style.transform = "";
+    };
+    el.addEventListener("pointerdown", onDown, { passive: true });
+    el.addEventListener("pointermove", update, { passive: true });
+    el.addEventListener("pointerup", reset, { passive: true });
+    el.addEventListener("pointercancel", reset, { passive: true });
+    el.addEventListener("pointerleave", reset, { passive: true });
+  }
+
+  function attachMagnifyDock(dock) {
+    const items = Array.from(dock.querySelectorAll(".tabs__item"));
+    let active = false;
+    const move = (clientX) => {
+      const radius = 92;
+      items.forEach((it) => {
+        const r = it.getBoundingClientRect();
+        const center = r.left + r.width / 2;
+        const dist = Math.abs(clientX - center);
+        const ratio = Math.max(0, 1 - dist / radius);
+        const scale = 1 + 0.18 * Math.pow(ratio, 1.5);
+        const lift = -5 * ratio;
+        it.style.transform = ratio > 0.02 ? `translateY(${lift.toFixed(1)}px) scale(${scale.toFixed(3)})` : "";
+      });
+    };
+    const clear = () => {
+      active = false;
+      items.forEach((it) => (it.style.transform = ""));
+    };
+    dock.addEventListener(
+      "pointerdown",
+      (e) => {
+        active = true;
+        move(e.clientX);
+      },
+      { passive: true }
+    );
+    dock.addEventListener(
+      "pointermove",
+      (e) => {
+        if (!active && e.pointerType === "touch") return;
+        move(e.clientX);
+      },
+      { passive: true }
+    );
+    dock.addEventListener("pointerup", clear, { passive: true });
+    dock.addEventListener("pointercancel", clear, { passive: true });
+    dock.addEventListener("pointerleave", clear, { passive: true });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Shell: Floating Island Collapsible Sidebar + Floating Glass Tabs    */
   /* ------------------------------------------------------------------ */
   const NAV = [
     { id: "library", href: "#/", icon: "cards", label: () => T("我的卡片") },
@@ -70,33 +152,82 @@
     { id: "samples", href: "#/samples", icon: "sparkle", label: () => T("示範作品") },
     { id: "create", href: "#/create", icon: "plus", label: () => T("製作卡片") },
   ];
-  let side, tabs, counter, syncBtn;
+  let side, tabs, counter, syncBtn, collapseBtn;
 
   function mount() {
     const view = document.getElementById("view");
     const cfg = window.HC_CONFIG || {};
+    let collapsed = false;
+    try {
+      collapsed = localStorage.getItem(COLLAPSE_KEY) === "1";
+    } catch (e) {}
+    document.documentElement.classList.toggle("is-side-collapsed", collapsed);
+
     counter = h("span.side__count");
-    const items = NAV.map((n) =>
-      h(
+    const items = NAV.map((n) => {
+      const lbl = n.label();
+      return h(
         "a.side__item",
-        { href: n.href, dataset: { nav: n.id } },
+        { href: n.href, dataset: { nav: n.id }, title: lbl },
         icon(n.icon),
-        h("span.side__label", n.label()),
+        h("span.side__label", lbl),
         n.id === "library" ? counter : null
-      )
+      );
+    });
+
+    const syncCollapseLabel = () => {
+      const isCol = document.documentElement.classList.contains("is-side-collapsed");
+      const text = isCol ? T("展開側邊欄") : T("收起側邊欄");
+      if (collapseBtn) {
+        collapseBtn.title = text;
+        collapseBtn.setAttribute("aria-label", text);
+        collapseBtn.setAttribute("aria-expanded", String(!isCol));
+      }
+    };
+
+    collapseBtn = h(
+      "button.side__toggle",
+      {
+        type: "button",
+        onclick: () => {
+          const next = !document.documentElement.classList.contains("is-side-collapsed");
+          document.documentElement.classList.toggle("is-side-collapsed", next);
+          try {
+            localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+          } catch (e) {}
+          syncCollapseLabel();
+        },
+      },
+      icon("sidebar")
     );
-    syncBtn = h("button.side__item.side__sync", { type: "button", onclick: () => HC.openCloud && HC.openCloud(() => refreshSync()) }, icon("cloud"), h("span.side__label"));
+    syncCollapseLabel();
+
+    syncBtn = h(
+      "button.side__item.side__sync",
+      { type: "button", onclick: () => HC.openCloud && HC.openCloud(() => refreshSync()) },
+      icon("cloud"),
+      h("span.side__label")
+    );
+    const settingsLabel = T("設定");
     side = h(
       "aside.side",
       { "aria-label": T("主要") },
       h(
-        "a.side__brand",
-        { href: "#/" },
-        h("img", { src: "brand/logo-mark-64.png", srcset: "brand/logo-mark-128.png 2x", alt: "", width: 34, height: 34, draggable: false }),
-        h("span", cfg.siteName || "3D Cards")
+        "div.side__top",
+        h(
+          "a.side__brand",
+          { href: "#/", title: cfg.siteName || "3D Cards" },
+          h("img", { src: "brand/logo-mark-64.png", srcset: "brand/logo-mark-128.png 2x", alt: "", width: 34, height: 34, draggable: false }),
+          h("span", cfg.siteName || "3D Cards")
+        ),
+        collapseBtn
       ),
       h("nav.side__nav", items),
-      h("div.side__foot", syncBtn, h("a.side__item", { href: "#/settings", dataset: { nav: "settings" } }, icon("gear"), h("span.side__label", T("設定"))))
+      h(
+        "div.side__foot",
+        syncBtn,
+        h("a.side__item", { href: "#/settings", dataset: { nav: "settings" }, title: settingsLabel }, icon("gear"), h("span.side__label", settingsLabel))
+      )
     );
     tabs = h(
       "nav.tabs",
@@ -107,6 +238,18 @@
       h("a.tabs__item", { href: "#/samples", dataset: { nav: "samples" } }, icon("sparkle"), h("span", T("示範"))),
       h("a.tabs__item", { href: "#/settings", dataset: { nav: "settings" } }, icon("gear"), h("span", T("設定")))
     );
+    attachMagnifyDock(tabs);
+
+    // Shrink-on-scroll state on top header bar
+    view.addEventListener(
+      "scroll",
+      () => {
+        const bar = view.querySelector(".bar");
+        if (bar) bar.classList.toggle("is-scrolled", view.scrollTop > 8);
+      },
+      { passive: true }
+    );
+
     const shell = h("div.shell", side, h("div.shell__main", view), tabs);
     document.body.prepend(shell);
     refreshSync();
@@ -118,7 +261,9 @@
     const c = HC.cloud;
     syncBtn.hidden = !(c && c.available);
     if (c && c.available) {
-      syncBtn.querySelector(".side__label").textContent = c.signedIn ? T("雲端同步") : T("用 Google 同步");
+      const txt = c.signedIn ? T("雲端同步") : T("用 Google 同步");
+      syncBtn.querySelector(".side__label").textContent = txt;
+      syncBtn.title = txt;
       syncBtn.classList.toggle("is-on", !!c.signedIn);
     }
   }
@@ -138,12 +283,24 @@
 
   /* Page header: title, count, actions. */
   function header({ title, count, back, actions, sub }) {
-    return h(
+    const countEl = count != null ? h("span.bar__count", String(count)) : null;
+    const el = h(
       "header.bar",
       back ? h("a.bar__back", { href: back.href, "aria-label": back.label }, icon("back"), h("span.bar__back-label", back.label)) : null,
-      h("div.bar__title", h("h1", title), count != null ? h("span.bar__count", String(count)) : null, sub ? h("span.bar__sub", sub) : null),
+      h("div.bar__title", h("h1", title), countEl, sub ? h("span.bar__sub", sub) : null),
       h("div.bar__actions", actions || [])
     );
+    el._setCount = (n) => {
+      if (!countEl) return;
+      const s = String(n);
+      if (countEl.textContent !== s) {
+        countEl.textContent = s;
+        countEl.classList.remove("is-bump");
+        void countEl.offsetWidth;
+        countEl.classList.add("is-bump");
+      }
+    };
+    return el;
   }
 
   function toolButton(ic, label, onclick, extra) {
@@ -151,16 +308,94 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Custom Single-Select Component (Section 3.1 of Vibe UI/UX Skill)    */
+  /* ------------------------------------------------------------------ */
+  function customSelect({ label, options, value, onChange }) {
+    let cur = value;
+    const curLabel = () => (options.find((o) => o.value === cur) || options[0]).label;
+    const textEl = h("span.cselect__text", curLabel());
+    const trigger = h(
+      "button.cselect__btn",
+      { type: "button", "aria-haspopup": "listbox", "aria-expanded": "false", "aria-label": label },
+      textEl,
+      icon("chevron")
+    );
+    const wrap = h("div.cselect", trigger);
+    let pop = null;
+
+    function close() {
+      if (!pop) return;
+      pop.remove();
+      pop = null;
+      trigger.setAttribute("aria-expanded", "false");
+      wrap.classList.remove("is-open");
+      document.removeEventListener("pointerdown", onOut, true);
+      document.removeEventListener("keydown", onEsc, true);
+    }
+    function onOut(e) {
+      if (!wrap.contains(e.target)) close();
+    }
+    function onEsc(e) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close();
+      }
+    }
+    trigger.addEventListener("click", () => {
+      if (pop) {
+        close();
+        return;
+      }
+      pop = h(
+        "div.cselect__menu",
+        { role: "listbox", "aria-label": label },
+        options.map((opt) => {
+          const selected = opt.value === cur;
+          return h(
+            "button.cselect__opt" + (selected ? ".is-selected" : ""),
+            {
+              type: "button",
+              role: "option",
+              "aria-selected": String(selected),
+              onclick: () => {
+                cur = opt.value;
+                textEl.textContent = opt.label;
+                close();
+                if (onChange) onChange(cur);
+              },
+            },
+            h("span.cselect__opt-label", opt.label),
+            icon("check")
+          );
+        })
+      );
+      wrap.appendChild(pop);
+      wrap.classList.add("is-open");
+      trigger.setAttribute("aria-expanded", "true");
+      setTimeout(() => {
+        document.addEventListener("pointerdown", onOut, true);
+        document.addEventListener("keydown", onEsc, true);
+      });
+    });
+    return wrap;
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Menus and confirmations                                             */
   /* ------------------------------------------------------------------ */
   let openMenu = null;
+  let openBackdrop = null;
   function closeMenu() {
     if (openMenu) {
       openMenu.remove();
       openMenu = null;
-      document.removeEventListener("pointerdown", outside, true);
-      document.removeEventListener("keydown", menuKey, true);
     }
+    if (openBackdrop) {
+      openBackdrop.remove();
+      openBackdrop = null;
+    }
+    document.removeEventListener("pointerdown", outside, true);
+    document.removeEventListener("keydown", menuKey, true);
   }
   function outside(e) {
     if (openMenu && !openMenu.contains(e.target)) closeMenu();
@@ -176,25 +411,31 @@
     closeMenu();
     const list = items.filter((i) => i && !i.hidden);
     const sheet = narrow();
+    if (sheet) {
+      openBackdrop = h("div.menu-backdrop", { onclick: closeMenu });
+      document.body.appendChild(openBackdrop);
+    }
     const menu = h(sheet ? "div.menu.menu--sheet" : "div.menu", { role: "menu" });
+    if (sheet) menu.appendChild(h("div.menu__grab", { "aria-hidden": "true" }));
+    let idx = 0;
     list.forEach((it) => {
       if (it === "-") return menu.appendChild(h("hr.menu__rule"));
-      menu.appendChild(
-        h(
-          "button.menu__item" + (it.danger ? ".is-danger" : ""),
-          {
-            type: "button",
-            role: "menuitem",
-            onclick: () => {
-              closeMenu();
-              it.run();
-            },
+      const btn = h(
+        "button.menu__item" + (it.danger ? ".is-danger" : ""),
+        {
+          type: "button",
+          role: "menuitem",
+          onclick: () => {
+            closeMenu();
+            it.run();
           },
-          icon(it.icon),
-          h("span", it.label),
-          it.key ? h("kbd", it.key) : null
-        )
+        },
+        icon(it.icon),
+        h("span", it.label),
+        it.key ? h("kbd", it.key) : null
       );
+      btn.style.setProperty("--item-idx", String(idx++));
+      menu.appendChild(btn);
     });
     if (sheet) menu.appendChild(h("button.menu__cancel", { type: "button", onclick: closeMenu }, T("取消")));
     document.body.appendChild(menu);
@@ -310,7 +551,7 @@
   /* ------------------------------------------------------------------ */
   /* Library: my cards / samples                                         */
   /* ------------------------------------------------------------------ */
-  const libState = { query: "", sort: "new" };
+  const libState = { query: "", sort: "new", foils: new Set() };
 
   function dateText(ms) {
     if (!ms) return "";
@@ -333,25 +574,82 @@
     const searchBox = h("label.search", icon("search"), search);
     const sortSel = samples
       ? null
-      : h(
-          "select.select",
-          { "aria-label": T("排序") },
-          h("option", { value: "new" }, T("最新的在前")),
-          h("option", { value: "old" }, T("最舊的在前")),
-          h("option", { value: "name" }, T("依名稱"))
-        );
-    if (sortSel) sortSel.value = libState.sort;
+      : customSelect({
+          label: T("排序"),
+          value: libState.sort,
+          options: [
+            { value: "new", label: T("最新的在前") },
+            { value: "old", label: T("最舊的在前") },
+            { value: "name", label: T("依名稱") },
+          ],
+          onChange: (val) => {
+            libState.sort = val;
+            fill();
+          },
+        });
 
     const addLink = toolButton("link", T("用連結加入"), () => HC.openAddByLink());
     const imp = toolButton("import", T("匯入卡片檔"), pickImport);
     const make = h("a.btn.btn--accent.bar__make", { href: "#/create" }, icon("plus"), h("span", T("製作卡片")));
-    root.appendChild(
-      header({
-        title: samples ? T("示範作品") : T("我的卡片"),
-        count: source.length,
-        actions: samples ? [searchBox] : [searchBox, sortSel, imp, addLink, make],
-      })
+    const headBar = header({
+      title: samples ? T("示範作品") : T("我的卡片"),
+      count: source.length,
+      actions: samples ? [searchBox] : [searchBox, sortSel, imp, addLink, make],
+    });
+    root.appendChild(headBar);
+
+    /* Multi-select Filter Chips (Section 7.01 of Vibe UI/UX Skill) */
+    const chipDefs = [
+      ...(HC.FOILS || []).map((f) => ({ id: f.id, label: f.name, swatch: f.id })),
+      { id: "sand", label: T("流沙"), swatch: null },
+    ];
+    const clearChip = h(
+      "button.filter-clear",
+      {
+        type: "button",
+        hidden: !libState.foils.size,
+        onclick: () => {
+          libState.foils.clear();
+          filterBar.querySelectorAll(".filter-chip").forEach((c) => {
+            c.classList.remove("is-selected");
+            c.setAttribute("aria-pressed", "false");
+          });
+          clearChip.hidden = true;
+          fill();
+        },
+      },
+      h("span", T("清除篩選")),
+      h("span", { "aria-hidden": "true" }, "×")
     );
+    const filterBar = h(
+      "div.filter-bar",
+      { role: "group", "aria-label": T("篩選卡片"), hidden: !source.length },
+      chipDefs.map((cd) => {
+        const on = libState.foils.has(cd.id);
+        const btn = h(
+          "button.filter-chip" + (on ? ".is-selected" : ""),
+          {
+            type: "button",
+            "aria-pressed": String(on),
+            dataset: { chip: cd.id },
+            onclick: () => {
+              if (libState.foils.has(cd.id)) libState.foils.delete(cd.id);
+              else libState.foils.add(cd.id);
+              const sel = libState.foils.has(cd.id);
+              btn.classList.toggle("is-selected", sel);
+              btn.setAttribute("aria-pressed", String(sel));
+              clearChip.hidden = !libState.foils.size;
+              fill();
+            },
+          },
+          h("span.filter-chip__check", icon("check")),
+          h("span.filter-chip__label", cd.label)
+        );
+        return btn;
+      }),
+      clearChip
+    );
+    root.appendChild(filterBar);
 
     const grid = h("ul.binder", { role: "list" });
     const empty = h("div.empty");
@@ -362,17 +660,30 @@
       cards.splice(0).forEach((c) => c.destroy());
       grid.replaceChildren();
       const q = libState.query.trim().toLowerCase();
-      let list = source.filter((c) => !q || [c.title, c.subtitle, c.serial].some((v) => String(v || "").toLowerCase().includes(q)));
+      let list = source.filter((c) => {
+        if (q && ![c.title, c.subtitle, c.serial].some((v) => String(v || "").toLowerCase().includes(q))) return false;
+        if (libState.foils.size) {
+          const matchFoil = libState.foils.has(c.foil) || (c.fg && c.fgFoil && libState.foils.has(c.fgFoil));
+          const matchSand = libState.foils.has("sand") && c.fg && c.sand;
+          if (!matchFoil && !matchSand) return false;
+        }
+        return true;
+      });
       if (!samples) {
         if (libState.sort === "old") list = list.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         if (libState.sort === "name") list = list.slice().sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), HC.lang === "en" ? "en" : "zh-Hant"));
       }
+      if (headBar._setCount) headBar._setCount(list.length);
       empty.hidden = !!list.length;
       grid.hidden = !list.length;
       if (!list.length) {
         empty.replaceChildren(
-          q
-            ? h("div.empty__box", h("p.empty__title", T("找不到「{q}」", { q: libState.query.trim() })), h("p.empty__text", T("換個關鍵字試試。")))
+          q || libState.foils.size
+            ? h(
+                "div.empty__box",
+                h("p.empty__title", T("找不到「{q}」", { q: libState.query.trim() || "…" })),
+                h("p.empty__text", T("換個關鍵字試試。"))
+              )
             : h(
                 "div.empty__box",
                 h("img.empty__art", { src: "brand/logo-mark-192.png", alt: "", width: 120, height: 120, draggable: false }),
@@ -391,21 +702,64 @@
       list.forEach((data) => {
         const card = new HC.HoloCard(data, { maxTilt: 10, gyro: false });
         cards.push(card);
-        const open = h("a.slot__card", { href: "#/card/" + data.id, "aria-label": T("打開「{title}」", { title: data.title || T("未命名卡片") }), draggable: false }, card.el);
+        const open = h(
+          "a.slot__card",
+          { href: "#/card/" + data.id, "aria-label": T("打開「{title}」", { title: data.title || T("未命名卡片") }), draggable: false },
+          h("span.slot__glow", { "aria-hidden": "true" }),
+          card.el
+        );
+        attachPressTilt(open);
+
         const more = h("button.slot__more", { type: "button", "aria-label": T("更多動作"), title: T("更多動作") }, icon("more"));
         more.addEventListener("click", (e) => {
           e.preventDefault();
+          e.stopPropagation();
           cardMenu(data, { el: more }, reload);
         });
-        const slot = h(
-          "li.slot",
-          open,
+
+        /* Card Tray underneath the main card sleeve (Section 6.04 of Vibe UI/UX Skill) */
+        const trayToggle = h(
+          "button.slot__tray-toggle",
+          {
+            type: "button",
+            "aria-expanded": "false",
+            onclick: (e) => {
+              e.stopPropagation();
+              const isOpen = tray.classList.toggle("is-open");
+              trayToggle.setAttribute("aria-expanded", String(isOpen));
+            },
+          },
           h(
-            "div.slot__label",
-            h("div.slot__text", h("p.slot__title", data.title || T("未命名卡片")), h("p.slot__meta", samples ? HC.describe(data) : data.fromShare ? T("{d}從連結加入", { d: dateText(data.createdAt) }) : dateText(data.createdAt))),
-            more
+            "div.slot__text",
+            h("p.slot__title", data.title || T("未命名卡片")),
+            h(
+              "p.slot__meta",
+              samples ? HC.describe(data) : data.fromShare ? T("{d}從連結加入", { d: dateText(data.createdAt) }) : dateText(data.createdAt) || HC.describe(data)
+            )
+          ),
+          icon("chevron")
+        );
+
+        const tray = h(
+          "div.slot__tray",
+          h("div.slot__label", trayToggle, more),
+          h(
+            "div.slot__tray-body",
+            h(
+              "div.slot__tray-inner",
+              h("p.slot__tray-spec", HC.describe(data)),
+              h(
+                "div.slot__tray-actions",
+                h("button.slot__pill", { type: "button", onclick: () => actions.open(data) }, icon("cards"), h("span", T("打開"))),
+                h("button.slot__pill", { type: "button", onclick: () => actions.fullscreen(data) }, icon("expand"), h("span", T("全螢幕"))),
+                h("button.slot__pill", { type: "button", onclick: () => actions.share(data) }, icon("share"), h("span", T("分享"))),
+                data.own ? h("button.slot__pill", { type: "button", onclick: () => actions.edit(data) }, icon("edit"), h("span", T("編輯"))) : null
+              )
+            )
           )
         );
+
+        const slot = h("li.slot", open, tray);
         slot.addEventListener("contextmenu", (e) => {
           e.preventDefault();
           cardMenu(data, { x: e.clientX, y: e.clientY }, reload);
@@ -428,11 +782,6 @@
       libState.query = search.value;
       fill();
     });
-    if (sortSel)
-      sortSel.addEventListener("change", () => {
-        libState.sort = sortSel.value;
-        fill();
-      });
     fill();
     refreshCount();
 
@@ -555,7 +904,7 @@
       h("div.panel__section", h("h2.panel__label", T("試看其他鐳射")), foils, note)
     );
 
-    /* Phone: actions at the bottom */
+    /* Phone: floating glass action dock at the bottom */
     const phoneBar = h(
       "div.actionbar",
       toolButton("share", T("分享"), () => actions.share(data, syncShare)),
@@ -733,7 +1082,7 @@
     );
     syncCloud();
 
-    const verText = h("p.set__value", MODE.tauri ? "…" : T("網頁版"));
+    const verText = h("p.set__value", "3D Cards");
     if (D && D.version) D.version().then((v) => (verText.textContent = "3D Cards " + v)).catch(() => {});
     const gyroBtn = HC.gyroButton("btn btn--soft");
 
