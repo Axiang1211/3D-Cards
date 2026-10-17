@@ -389,7 +389,7 @@ function safeEqual(a, b) {
 const REPO = "Axiang1211/3D-Cards";
 async function release(env) {
   const cache = caches.default;
-  const key = new Request("https://cache.internal/release-" + REPO);
+  const key = new Request("https://cache.internal/release-v2-" + REPO);
   const hit = await cache.match(key);
   if (hit) return hit;
   let out = { version: "", date: "", assets: {} };
@@ -417,6 +417,11 @@ async function release(env) {
       const size = async (file) => {
         const h = await fetch(`https://github.com/${REPO}/releases/latest/download/${file}`, { method: "HEAD", headers: { "User-Agent": "3d-cards-site" } });
         const n = +h.headers.get("Content-Length");
+        const lm = h.headers.get("Last-Modified");
+        if (lm && !out.date) {
+          const dt = new Date(lm);
+          if (!Number.isNaN(dt.getTime())) out.date = dt.toISOString();
+        }
         return h.ok && n ? { size: n } : null;
       };
       const [win, dmg, apk] = await Promise.all([size("3D-Cards-Setup.exe"), size("3D-Cards.dmg"), size("3D-Cards.apk")]);

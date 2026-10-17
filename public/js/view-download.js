@@ -184,11 +184,20 @@
     fetch("/api/release")
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
-      .then((d) => (d && d.version ? d : cfg.repoUrl ? fromGitHub() : null))
+      .then((d) => {
+        if (!d || !d.version) return cfg.repoUrl ? fromGitHub() : null;
+        if (!d.date && cfg.repoUrl) {
+          return fromGitHub()
+            .then((g) => (g && g.date ? Object.assign({}, d, { date: g.date }) : d))
+            .catch(() => d);
+        }
+        return d;
+      })
       .then((d) => {
         if (!d || !d.version) return;
         const date = d.date ? new Date(d.date) : null;
-        version.textContent = date
+        const validDate = date && !Number.isNaN(date.getTime());
+        version.textContent = validDate
           ? T("最新版本 {v}，{y} 年 {m} 月 {d} 日發布", { v: d.version, y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() })
           : T("最新版本 {v}", { v: d.version });
         ["windows", "mac", "android"].forEach((k) => {
