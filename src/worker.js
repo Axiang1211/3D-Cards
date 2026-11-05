@@ -14,6 +14,9 @@ import { galleryApi } from "./gallery.js";
  *
  *   GET    /s/:id                  the share page (index.html with link-preview tags)
  *
+ *   GET    /api/app/:file          a file of the site exactly as stored (index.html without link-preview tags),
+ *                                  for small updates of the installed apps; app-update.json lists them
+ *
  * Public gallery, accounts and votes: see gallery.js (/api/me, /api/public, /api/admin).
  *
  * Storage: the KV namespace bound as SHARES (created automatically on first deploy).
@@ -74,6 +77,7 @@ export default {
 async function api(request, env, url) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (url.pathname === "/api/release" && request.method === "GET") return release(env);
+  if (url.pathname.startsWith("/api/app/") && request.method === "GET") return appFile(env, url);
   if (/^\/api\/(me|public|admin)(\/|$)/.test(url.pathname)) {
     return galleryApi(request, env, url, { json, cleanCard, randomId, sha256, IMAGE_RE });
   }
@@ -346,6 +350,20 @@ async function page(request, env, url, shareId) {
   }
 
   return rewriter.transform(new Response(res.body, { status: 200, headers }));
+}
+
+/* Installed apps download changed files from here (see scripts/app-manifest.mjs and public/js/desktop.js). */
+async function appFile(env, url) {
+  const file = url.pathname.slice(9);
+  if (!/^[\w.-]+(\/[\w.-]+)*$/.test(file) || file.split("/").some((p) => p.startsWith("."))) return json({ error: "找不到這個網址。" }, 404);
+  // Pages are stored without ".html" (requests for /terms.html are redirected to /terms, /index.html to /).
+  const at = file === "index.html" ? "/" : "/" + file.replace(/\.html$/, "");
+  const res = await env.ASSETS.fetch(new Request(new URL(at, url)));
+  if (!res.ok) return json({ error: "找不到這個網址。" }, 404);
+  const headers = new Headers(res.headers);
+  for (const [k, v] of Object.entries(CORS)) headers.set(k, v);
+  headers.set("Cache-Control", "no-cache");
+  return new Response(res.body, { status: 200, headers });
 }
 
 /* ------------------------------------------------------------------ */

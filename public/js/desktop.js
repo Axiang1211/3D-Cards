@@ -6,6 +6,8 @@
  *  - links to other sites open in the normal browser
  *  - on start-up, compares the app version with the newest GitHub release
  *    and offers the update (the app keeps working if the user says no)
+ *  - small updates: downloads the website's changed files, so the app shows the newest
+ *    page without a new release (see desktop/src-tauri/src/web_update.rs)
  */
 (function () {
   "use strict";
@@ -148,6 +150,78 @@
     askToUpdate(current, release);
   }
 
+  /*
+   * Small updates. The website lists its files in app-update.json (scripts/app-manifest.mjs).
+   * Files that changed are downloaded in the background and shown after a reload: right away
+   * if the app was just opened and not used yet, otherwise when the user agrees or on the next start.
+   * Checked on start-up, every 30 minutes, and when the app comes back to the front.
+   */
+  const UPDATE_BASE = String((window.HC_CONFIG || {}).siteUrl || "").replace(/\/+$/, "") + "/api/app/";
+  let webBusy = false;
+  let webChecked = 0;
+  let used = false;
+  ["pointerdown", "keydown"].forEach((t) => window.addEventListener(t, () => (used = true), { capture: true, once: true }));
+
+  async function checkWebUpdate() {
+    if (webBusy || Date.now() - webChecked < 10 * 60 * 1000 || UPDATE_BASE === "/api/app/") return;
+    webBusy = true;
+    webChecked = Date.now();
+    try {
+      const res = await fetch(UPDATE_BASE + "app-update.json", { cache: "no-store" });
+      if (!res.ok) return;
+      const list = await res.json();
+      if (!list || !list.version || !list.files || newer(list.minApp, await appVersion())) return;
+      const st = await T.core.invoke("web_update_status");
+      if ([st.current, st.ready].concat(st.bad).includes(list.version)) return;
+      const plan = await T.core.invoke("web_update_plan", { manifest: { version: list.version, files: list.files } });
+      if (!plan.changed) return;
+      for (const path of plan.download) {
+        const file = await fetch(UPDATE_BASE + path, { cache: "no-store" });
+        if (!file.ok) throw new Error(path + ": " + file.status);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        await T.core.invoke("web_update_file", bytes, { headers: { path: encodeURIComponent(path) } });
+      }
+      await T.core.invoke("web_update_finish", { version: list.version });
+      if (!used) applyWebUpdate();
+      else offerWebUpdate();
+    } catch (e) {
+      // Offline, or the website changed during the download: try again later.
+      webChecked = 0;
+      console.warn("small update:", e);
+    } finally {
+      webBusy = false;
+    }
+  }
+
+  async function applyWebUpdate() {
+    if (await T.core.invoke("web_update_apply")) location.reload();
+  }
+
+  function offerWebUpdate() {
+    if (document.querySelector("dialog[open]")) return; // applied on the next start
+    const h = HC.h;
+    const dlg = h("dialog.share", { "aria-labelledby": "webupd-title" });
+    dlg.append(
+      h(
+        "div.share__head",
+        h("h2.share__title", { id: "webupd-title" }, HC.t("有小更新")),
+        h("button.share__x", { type: "button", "aria-label": HC.t("關閉"), onclick: () => dlg.close() }, "×")
+      ),
+      h(
+        "div.share__body",
+        h("p.share__note", HC.t("新的內容已經下載好了。重新載入就能使用，或下次打開 3D Cards 時自動更新。")),
+        h(
+          "div.share__actions",
+          h("button.btn.btn--ink", { type: "button", onclick: applyWebUpdate }, HC.t("重新載入")),
+          h("button.btn.btn--quiet", { type: "button", onclick: () => dlg.close() }, HC.t("下次再說"))
+        )
+      )
+    );
+    dlg.addEventListener("close", () => dlg.remove());
+    document.body.appendChild(dlg);
+    dlg.showModal();
+  }
+
   window.HC_DESKTOP = {
     version: appVersion,
     openUrl: (url) => openUrl(url).catch(() => {}),
@@ -175,5 +249,15 @@
       if (T.event && T.event.listen) T.event.listen("open-cards", (e) => openCardFiles(e.payload));
     } catch (e) {}
     setTimeout(() => checkForUpdates(false), 2500);
+    // The page started: keep the small update it was loaded from (see web_update.rs).
+    setTimeout(() => {
+      const view = document.getElementById("view");
+      if (typeof HC.go === "function" && view && view.childElementCount > 0) T.core.invoke("web_update_ok").catch(() => {});
+    }, 1500);
+    checkWebUpdate();
+    setInterval(checkWebUpdate, 30 * 60 * 1000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") checkWebUpdate();
+    });
   });
 })();
