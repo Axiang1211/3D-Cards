@@ -4,6 +4,8 @@ node_modules/
 .DS_Store
 *.log
 desktop/web/
+public/app-update.json
 desktop/dist/
 desktop/src-tauri/gen/
 desktop/src-tauri/target/
+desktop/src-tauri/Cargo.lock

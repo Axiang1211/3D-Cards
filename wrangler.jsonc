@@ -4,6 +4,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "3d-cards",
   "main": "src/worker.js",
+  // Before every deploy: list the app's files for small app updates (see scripts/app-manifest.mjs).
+  "build": { "command": "node scripts/app-manifest.mjs" },
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./public",

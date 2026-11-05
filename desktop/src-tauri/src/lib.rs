@@ -5,6 +5,10 @@
 // already open) and passes the card to the page, which saves it.
 // Windows gives the file as a command-line argument; macOS sends it as an
 // "open file" event (RunEvent::Opened).
+//
+// Small updates of the page itself come from the website: see web_update.rs.
+
+mod web_update;
 
 use std::sync::Mutex;
 
@@ -70,14 +74,31 @@ pub fn run() {
         }));
     }
 
+    // The page's files: the downloaded update where there is one, otherwise the app's own.
+    let mut context = tauri::generate_context!();
+    let embedded = context.set_assets(Box::new(web_update::NoAssets));
+    let web = web_update::WebAssets::new(embedded);
+    let update = web.0.clone();
+    context.set_assets(Box::new(web));
+
     let app = builder
         .plugin(tauri_plugin_opener::init())
+        .manage(update)
         .manage(PendingCards(Mutex::new(Pending {
             ready: false,
             cards: card_files(&args),
         })))
-        .invoke_handler(tauri::generate_handler![take_opened_cards, is_store_app])
-        .build(tauri::generate_context!())
+        .invoke_handler(tauri::generate_handler![
+            take_opened_cards,
+            is_store_app,
+            web_update::web_update_status,
+            web_update::web_update_plan,
+            web_update::web_update_file,
+            web_update::web_update_finish,
+            web_update::web_update_apply,
+            web_update::web_update_ok
+        ])
+        .build(context)
         .expect("failed to start 3D Cards");
 
     app.run(|_app, _event| {
